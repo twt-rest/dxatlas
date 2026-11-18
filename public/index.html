@@ -748,6 +748,7 @@ function updateButtons(){const has=!!S.base;$('#lblDet').classList.toggle('dis',
   for(const id of['bLocate','bRefine','bColor','bLC','bDel'])$('#'+id).disabled=S.busy&&id!=='bDel'}
 
 /* ---------- chargement des images ---------- */
+const newKey=()=>Math.random().toString(36).slice(2)+Date.now().toString(36);
 async function loadBitmap(file){return await createImageBitmap(file)}
 function workCanvas(bmp,maxSide){const k=Math.min(1,maxSide/Math.max(bmp.width,bmp.height));return downscaleCanvas(bmp,Math.max(1,Math.round(bmp.width*k)),Math.max(1,Math.round(bmp.height*k)))}
 function thumbOf(bmp){const c=document.createElement('canvas');c.width=88;c.height=68;const x=c.getContext('2d');x.fillStyle='#000';x.fillRect(0,0,88,68);const k=Math.min(88/bmp.width,68/bmp.height);x.imageSmoothingQuality='high';x.drawImage(bmp,(88-bmp.width*k)/2,(68-bmp.height*k)/2,bmp.width*k,bmp.height*k);return c}
@@ -758,6 +759,7 @@ async function setBase(file){
     if(!r){bmp.close&&bmp.close();hint();setStatus(S.base?'Chargement annulé.':'Chargez la photo d’ensemble.');return}
     r.__src=[bmp.width,bmp.height];
     await setBaseSource(r,file.name);bmp.close&&bmp.close();
+    if(S.base&&S.base.name===file.name){S.base.file=file;S.base.fkey=newKey()}
   }catch(err){setStatus('Impossible de lire cette image : '+err.message,true)}
 }
 async function setBaseSource(bmp,name){
@@ -899,7 +901,7 @@ async function addDetails(files){
   const added=[];
   S.showAll=true;syncShow();
   for(const f of files){
-    try{setStatus('Chargement de '+f.name+'…',false,.1);await tick();const bmp=await loadBitmap(f),t=makeTexture(bmp);const L=newLayer(f,bmp,t);S.layers.push(L);added.push(L);select(L.id);S.dirty=true;updateButtons();await tick(60)}
+    try{setStatus('Chargement de '+f.name+'…',false,.1);await tick();const bmp=await loadBitmap(f),t=makeTexture(bmp);const L=newLayer(f,bmp,t);L.file=f;L.fkey=newKey();S.layers.push(L);added.push(L);select(L.id);S.dirty=true;updateButtons();await tick(60)}
     catch(err){setStatus('Lecture impossible ('+f.name+') : '+err.message,true)}
   }
   S.tool='corners';[...$('#segTool').children].forEach(b=>b.classList.toggle('on',b.dataset.v==='corners'));hint();
@@ -910,7 +912,7 @@ $('#fBase2').onchange=e=>{if(e.target.files[0])setBase(e.target.files[0]);e.targ
 $('#fDet').onchange=e=>{const f=[...e.target.files];e.target.value='';if(f.length)addDetails(f)};
 for(const ev of['dragover','drop'])window.addEventListener(ev,e=>{e.preventDefault();if(ev==='drop'){const all=[...e.dataTransfer.files];if(all.some(x=>/\.json$/i.test(x.name)))return openProject(all);const f=all.filter(x=>x.type.startsWith('image/'));if(!f.length)return;if(!S.base)setBase(f[0]).then(()=>f.length>1&&addDetails(f.slice(1)));else addDetails(f)}});
 
-glc.addEventListener('webglcontextlost',e=>{e.preventDefault();setStatus('La mémoire graphique est saturée : retirez des détails ou rechargez la page (enregistrez vos réglages en .json pour les rouvrir ensuite).',true)});
+glc.addEventListener('webglcontextlost',e=>{e.preventDefault();setStatus('La mémoire graphique est saturée : retirez des détails ou rechargez la page (votre travail est sauvegardé automatiquement et sera rétabli après rechargement).',true)});
 window.addEventListener('unhandledrejection',e=>{console.error(e.reason);setStatus('Erreur : '+((e.reason&&e.reason.message)||e.reason),true)});
 window.addEventListener('error',e=>{setStatus('Erreur : '+e.message,true)});
 /* ---------- OpenCV ---------- */
@@ -1282,13 +1284,16 @@ $('#eGo').onclick=async()=>{
   }catch(e){console.error(e);st.textContent='Échec : '+(e&&e.message||e);$('#eWarn').textContent='Essayez une échelle plus petite.'}
   finally{exporting=false;$('#eGo').disabled=false;gl.bindFramebuffer(gl.FRAMEBUFFER,null);S.dirty=true}
 };
-$('#eJson').onclick=async()=>{
+function projectObject(withMask=true){
   const num=a=>a?Array.from(Object.values(a)):a;
-  const o={version:2,scale:S.pxPerMm?{pxPerMm:S.pxPerMm,ref:S.calib.ref}:null,
+  return {version:2,scale:S.pxPerMm?{pxPerMm:S.pxPerMm,ref:S.calib.ref}:null,
     base:{name:S.base.name,w:S.base.w,h:S.base.h,src:S.base.src,crop:S.base.crop},
     layers:S.layers.map(L=>({name:L.name,pxPerMm:S.pxPerMm?layerRes(L).pxmm:null,w:L.w,h:L.h,corners:L.corners,grid:L.grid,opacity:L.opacity,feather:L.feather,
       color:{...L.color,fit:L.color.fit?{...L.color.fit,M:num(L.color.fit.M),b:num(L.color.fit.b)}:null},
-      located:L.located,visible:L.visible,locked:!!L.locked,mask:(L.maskC&&L.maskOn)?L.maskC.toDataURL('image/png'):null}))};
+      located:L.located,visible:L.visible,locked:!!L.locked,mask:(withMask&&L.maskC&&L.maskOn)?L.maskC.toDataURL('image/png'):null}))};
+}
+$('#eJson').onclick=async()=>{
+  const o=projectObject();
   try{await saveBlob('reglages-recalage.json',new Blob([JSON.stringify(o,null,1)],{type:'application/json'}))}catch(e){$('#eStat').textContent='Échec : '+e.message;$('#eBarWrap').style.display='block'}
 };
 
@@ -1323,6 +1328,7 @@ async function openProject(files){
       out.__crop=c||null;out.__src=P.base.src||[bmp.width,bmp.height];
       await setBaseSource(out,bf.name);bmp.close&&bmp.close();
       if(!S.base||S.base.name!==bf.name)throw new Error('image d’ensemble non chargée');
+      S.base.file=bf;S.base.fkey=bf.fkey||newKey();
     }
     if(P.scale&&P.scale.pxPerMm){S.pxPerMm=P.scale.pxPerMm;S.calib.ref=P.scale.ref||null;S.showScale=true;syncCalib();updScaleInfo()}
     S.showAll=true;syncShow();
@@ -1333,6 +1339,7 @@ async function openProject(files){
       const bmp=await loadBitmap(f);
       if(bmp.width!==PL.w||bmp.height!==PL.h){skipped.push(PL.name+' ('+bmp.width+'×'+bmp.height+' au lieu de '+PL.w+'×'+PL.h+')');bmp.close&&bmp.close();continue}
       const L=newLayer(f,bmp,makeTexture(bmp)),cp=a=>JSON.parse(JSON.stringify(a));
+      L.file=f;L.fkey=f.fkey||newKey();
       L.name=PL.name;L.corners=cp(PL.corners);L.grid=PL.grid?cp(PL.grid):null;
       if(PL.opacity!=null)L.opacity=PL.opacity;if(PL.feather!=null)L.feather=PL.feather;
       if(PL.color){L.color=Object.assign({fit:null,ev:0,contrast:1,sat:1,warm:0,tint:0},cp(PL.color));if(L.color.fit){L.color.fit.M=Array.from(Object.values(L.color.fit.M));L.color.fit.b=Array.from(Object.values(L.color.fit.b))}}
@@ -1353,11 +1360,52 @@ async function openProject(files){
 }
 $('#fProj').onchange=e=>{const f=[...e.target.files];e.target.value='';if(f.length)openProject(f)};
 
+/* ---------- sauvegarde automatique (IndexedDB du navigateur) ---------- */
+S.maskRev=0;{const _um=uploadMask;uploadMask=function(L){S.maskRev++;return _um(L)}}
+const idbOpen=()=>new Promise((res,rej)=>{const r=indexedDB.open('atelier-recalage',1);r.onupgradeneeded=()=>{const d=r.result;d.createObjectStore('meta');d.createObjectStore('files')};r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)});
+const idbReq=r=>new Promise((res,rej)=>{r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)});
+let autoSig='',autoSaving=false,autoReady=false,idbP=null;
+const idb=()=>idbP||(idbP=idbOpen());
+async function autosave(){
+  if(!autoReady||autoSaving||S.busy||exporting)return;
+  autoSaving=true;
+  try{
+    const db=await idb(),store=n=>db.transaction(n,'readwrite').objectStore(n);
+    if(!S.base){
+      if(autoSig!=='none'){await idbReq(store('meta').clear());await idbReq(store('files').clear());autoSig='none'}
+      return;
+    }
+    const sig=JSON.stringify(projectObject(false))+'|'+S.maskRev+'|'+S.base.fkey+'|'+S.layers.map(L=>L.fkey).join();
+    if(sig===autoSig)return;
+    const keys=[S.base.fkey,...S.layers.map(L=>L.fkey)],have=new Set(await idbReq(store('files').getAllKeys()));
+    for(const o of[S.base,...S.layers]){if(o.file&&o.fkey&&!have.has(o.fkey)){const buf=await o.file.arrayBuffer();await idbReq(store('files').put({buf,type:o.file.type||''},o.fkey))}}
+    for(const k of have)if(!keys.includes(k))await idbReq(store('files').delete(k));
+    await idbReq(store('meta').put({P:projectObject(true),baseKey:S.base.fkey,keys:S.layers.map(L=>L.fkey),t:Date.now()},'session'));
+    autoSig=sig;
+  }catch(e){console.warn('sauvegarde auto impossible',e)}
+  finally{autoSaving=false}
+}
+async function restoreSession(){
+  try{
+    const db=await idb(),m=await idbReq(db.transaction('meta').objectStore('meta').get('session'));
+    if(!m||!m.P)return;
+    const fs=db.transaction('files').objectStore('files'),mk=async(key,name)=>{const r=await idbReq(fs.get(key));if(!r)return null;const f=new File([r.buf],name,{type:r.type});f.fkey=key;return f};
+    const list=[new File([JSON.stringify(m.P)],'session.json',{type:'application/json'})];
+    const bf=await mk(m.baseKey,m.P.base.name);if(bf)list.push(bf);
+    for(let i=0;i<m.P.layers.length;i++){const f=await mk(m.keys[i],m.P.layers[i].name+'.img');if(f)list.push(f)}
+    await openProject(list);
+    if(S.base){const el=$('#status');setStatus(el.textContent.replace(/^Réglages chargés/,'Session précédente rétablie'),el.className==='err')}
+  }catch(e){console.warn('restauration impossible',e)}
+}
+try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist()}catch(e){}
+setInterval(autosave,2500);
+
 /* ---------- démarrage ---------- */
 for(const ev of['gesturestart','gesturechange','gestureend'])document.addEventListener(ev,e=>e.preventDefault());
 window.__S=S;window.__dbg={resetCV,locate,renderRegion,eccRefine,select,fitView,updateLayer};
 resize();updateButtons();refreshList();
 new ResizeObserver(()=>{resize()}).observe($('#stage'));
+restoreSession().finally(()=>{autoReady=true});
 </script>
 </body>
 </html>
