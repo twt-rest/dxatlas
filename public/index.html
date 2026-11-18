@@ -116,6 +116,7 @@ input[type=text],input[type=number],select{background:var(--bg);color:var(--tx);
         <button data-v="grid" title="Corriger localement avec 5 points supplémentaires">Grille</button>
         <button data-v="erase" title="Effacer une partie du détail sélectionné en traçant un rectangle">Gomme</button>
       </div>
+      <button class="btn sm" id="bFree" hidden title="Coins libres : chaque poignée de coin se déplace indépendamment (perspective). Désactivé : le détail se redimensionne en conservant ses angles et ses proportions.">Coins libres</button>
       <button class="btn sm" id="bEUndo" hidden title="Annuler la dernière zone effacée">↶ Annuler</button>
       <button class="btn sm on" id="bShow" title="Afficher / masquer tous les détails (touche H)">Détails : visibles</button>
       <button class="btn sm" id="bCover" title="Colorier la zone du tableau couverte par les détails (touche Z)">Zone couverte</button>
@@ -596,7 +597,7 @@ ovc.addEventListener('pointerdown',e=>{
   if(S.tool==='erase'&&!S.calib.active&&sl&&vis(sl)){drag={type:'erase',p0:p,pts:[p],cur:p};S.dirty=true;return}
   if(S.calib.active){const rad=e.pointerType==='touch'?24:13;S.calib.pts.forEach((q,i)=>{const sp=o2s(q[0],q[1]);if(Math.hypot(sp[0]-p[0],sp[1]-p[1])<rad)hit={kind:'k',idx:i}})}
   else if(sl&&vis(sl)&&S.tool!=='view'){const rad=e.pointerType==='touch'?24:13;let best=1e9;for(const h of handles(sl)){const dd=Math.hypot(h.p[0]-p[0],h.p[1]-p[1]);if(dd<rad&&dd<best){best=dd;hit=h}}}
-  if(hit){drag={type:hit.kind,h:hit,sl}}
+  if(hit){drag={type:hit.kind,h:hit,sl,c0:sl?sl.corners.map(c=>c.slice()):null}}
   else if(!S.calib.active&&sl&&!sl.locked&&vis(sl)&&S.tool==='corners'&&inPoly(p,polyScreen(sl))){drag={type:'move',sl,start:s2o(p[0],p[1]),c0:sl.corners.map(c=>c.slice())}}
   else{drag={type:'pan',x0:S.view.x0,y0:S.view.y0,p,moved:false}}
   ovc.classList.toggle('grabbing',drag.type==='pan');
@@ -609,6 +610,9 @@ ovc.addEventListener('pointermove',e=>{
   const o=s2o(p[0],p[1]);
   if(drag.type==='erase'){drag.cur=p;if(S.eShape==='lasso'){const l=drag.pts[drag.pts.length-1];if(Math.hypot(p[0]-l[0],p[1]-l[1])>3)drag.pts.push(p)}S.dirty=true}
   else if(drag.type==='pan'){const dx=p[0]-drag.p[0],dy=p[1]-drag.p[1];if(Math.hypot(dx,dy)>4)drag.moved=true;S.view.x0=drag.x0-dx/S.view.z;S.view.y0=drag.y0-dy/S.view.z;S.dirty=true}
+  else if(drag.type==='c'&&!S.freeCorners){ // redimensionnement orthogonal : angles et proportions conservés, coin opposé fixe
+    const L=drag.sl,c0=drag.c0,opp=c0[(drag.h.idx+2)%4],v=[c0[drag.h.idx][0]-opp[0],c0[drag.h.idx][1]-opp[1]],vv=v[0]*v[0]+v[1]*v[1];
+    if(vv>1e-9){const k=Math.max(.03,((o[0]-opp[0])*v[0]+(o[1]-opp[1])*v[1])/vv);L.corners=c0.map(c=>[opp[0]+(c[0]-opp[0])*k,opp[1]+(c[1]-opp[1])*k]);L.located=true;updateLayer(L);refreshList()}}
   else if(drag.type==='c'){const L=drag.sl,old=L.corners[drag.h.idx].slice();const prevOff=null;L.corners[drag.h.idx]=[o[0],o[1]];if(!convexQuad(L.corners)){L.corners[drag.h.idx]=old}else{L.located=true;updateLayer(L);refreshList()}}
   else if(drag.type==='k'){S.calib.pts[drag.h.idx]=[o[0],o[1]];syncCalib();S.dirty=true}
   else if(drag.type==='g'){const L=drag.sl;if(!L.grid)L.grid=Array.from({length:9},()=>[0,0]);const base=applyH(L.H,drag.h.u,drag.h.v);L.grid[drag.h.idx]=[o[0]-base[0],o[1]-base[1]];updateLayer(L)}
@@ -639,9 +643,11 @@ function setStatus(t,err=false,prog=null){
   const el=$('#status');el.textContent=t;el.className=err?'err':'';const b=$('#bar');
   if(prog==null){b.style.display='none'}else{b.style.display='block';b.firstElementChild.style.width=Math.round(prog*100)+'%'}
 }
+function syncFree(){const b=$('#bFree');b.hidden=S.tool!=='corners';b.classList.toggle('on',!!S.freeCorners)}
+$('#bFree').onclick=()=>{S.freeCorners=!S.freeCorners;syncFree();hint()};
 function hint(){
-  const h=$('#hint');if(!S.base){h.hidden=true;return}h.hidden=false;
-  h.textContent={erase:'Gomme : tracez un rectangle sur le détail sélectionné pour en effacer cette partie.',view:'Vue : glisser pour déplacer, molette / pincement pour zoomer, toucher un détail pour le sélectionner.',corners:'Coins : tirez les 4 poignées (perspective). Glisser dans le détail le déplace ; flèches du clavier = ajustement fin.',grid:'Grille : les 4 coins + 5 points verts pour corriger les déformations locales.'}[S.tool];
+  syncFree();const h=$('#hint');if(!S.base){h.hidden=true;return}h.hidden=false;
+  h.textContent={erase:'Gomme : tracez un rectangle sur le détail sélectionné pour en effacer cette partie.',view:'Vue : glisser pour déplacer, molette / pincement pour zoomer, toucher un détail pour le sélectionner.',corners:S.freeCorners?'Coins libres : chaque poignée de coin bouge seule (perspective). Glisser dans le détail le déplace ; flèches du clavier = ajustement fin.':'Coins : tirer une poignée redimensionne le détail en gardant ses angles et ses proportions (coin opposé fixe). « Coins libres » pour déformer en perspective. Glisser dans le détail le déplace.',grid:'Grille : les 4 coins + 5 points verts pour corriger les déformations locales.'}[S.tool];
 }
 function select(id){S.sel=id;refreshList();syncControls();syncErase&&syncErase()}
 const TRASH='<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg>';
