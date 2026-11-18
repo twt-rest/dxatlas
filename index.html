@@ -1,0 +1,1295 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>Atelier de recalage — détails sur tableau</title>
+<style>
+:root{--bg:#141517;--panel:#1c1d20;--panel2:#24262a;--line:#32353b;--tx:#ebe8e1;--mut:#9b978d;--acc:#d9a441;--acc2:#f0c36a;--ok:#6fbf73;--warn:#e07a3f;--rad:8px}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--tx);font:14px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-text-size-adjust:100%}
+body{display:flex;flex-direction:column;overflow:hidden;touch-action:manipulation}
+header{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 12px;background:var(--panel);border-bottom:1px solid var(--line);flex:none}
+h1{font-size:15px;font-weight:600;margin:0;letter-spacing:.2px;white-space:nowrap}
+h1 span{color:var(--acc)}
+.hb{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;background:var(--panel2);color:var(--tx);border:1px solid var(--line);border-radius:var(--rad);padding:7px 11px;font:inherit;cursor:pointer;min-height:34px;user-select:none}
+.btn:hover{border-color:#4a4e56}
+.btn:disabled,.btn.dis{opacity:.45;pointer-events:none}
+.btn.primary{background:var(--acc);border-color:var(--acc);color:#1b1407;font-weight:600}
+.btn.on{border-color:var(--acc);color:var(--acc2)}
+.btn.sm{padding:4px 8px;min-height:28px;font-size:13px}
+.btn.danger:hover{border-color:#c0504d;color:#ff9a96}
+main{flex:1;display:flex;min-height:0}
+#stage{flex:1;position:relative;min-width:0;background:#0e0f10;overflow:hidden}
+#stage canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+#ov{touch-action:none;cursor:grab}
+#ov.grabbing{cursor:grabbing}
+.tb{position:absolute;display:flex;gap:8px;align-items:center;flex-wrap:wrap;z-index:3}
+.tl{top:8px;left:8px}.tr{top:8px;right:8px;justify-content:flex-end}
+.seg{display:inline-flex;background:rgba(28,29,32,.92);border:1px solid var(--line);border-radius:var(--rad);overflow:hidden;backdrop-filter:blur(6px)}
+.seg button{background:none;border:0;color:var(--mut);padding:7px 11px;font:inherit;cursor:pointer;min-height:34px}
+.seg button.on{background:var(--acc);color:#1b1407;font-weight:600}
+.mini{background:rgba(28,29,32,.92);border:1px solid var(--line);border-radius:var(--rad);padding:5px 9px;display:flex;align-items:center;gap:7px;color:var(--mut);font-size:12px}
+.mini input{width:90px}
+#hint{position:absolute;left:10px;bottom:10px;z-index:3;max-width:calc(100% - 20px);background:rgba(20,21,23,.85);border:1px solid var(--line);border-radius:var(--rad);padding:6px 10px;color:var(--mut);font-size:12px;pointer-events:none}
+#empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;z-index:2;padding:20px}
+#empty .card{max-width:440px;text-align:center;border:1.5px dashed #444850;border-radius:14px;padding:30px 26px;background:rgba(28,29,32,.6)}
+#empty h2{margin:0 0 8px;font-size:18px;font-weight:600}
+#empty p{margin:0 0 16px;color:var(--mut)}
+#panel{width:340px;flex:none;background:var(--panel);border-left:1px solid var(--line);overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:14px}
+.sec h3{margin:0 0 7px;font-size:11px;text-transform:uppercase;letter-spacing:.9px;color:var(--mut);font-weight:600}
+.row{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+#list{display:flex;flex-direction:column;gap:5px}
+.li{display:flex;align-items:center;gap:8px;padding:5px;border:1px solid var(--line);border-radius:var(--rad);background:var(--panel2);cursor:pointer}
+.li.sel{border-color:var(--acc);box-shadow:0 0 0 1px var(--acc) inset}
+.li canvas{width:44px;height:34px;border-radius:4px;background:#000;flex:none}
+.li .nm{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:13px}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--warn);flex:none}
+.dot.ok{background:var(--ok)}
+.ib{background:none;border:0;color:var(--mut);cursor:pointer;padding:4px 5px;font-size:15px;line-height:1;border-radius:5px}
+.ib:hover{color:var(--tx);background:#33363c}
+.ib.off{opacity:.35}
+.f{display:grid;grid-template-columns:92px 1fr 40px;gap:6px;align-items:center;margin:5px 0;font-size:13px}
+.f label{color:var(--mut)}
+.f output{text-align:right;color:var(--mut);font-variant-numeric:tabular-nums;font-size:12px}
+input[type=range]{width:100%;accent-color:var(--acc);min-height:22px}
+input[type=text],input[type=number],select{background:var(--bg);color:var(--tx);border:1px solid var(--line);border-radius:6px;padding:6px 8px;font:inherit;width:100%;min-height:32px}
+#status{font-size:12.5px;color:var(--mut);min-height:18px}
+#status.err{color:#ff9a7a}
+#bar{height:4px;background:var(--panel2);border-radius:3px;overflow:hidden;margin-top:5px;display:none}
+#bar i{display:block;height:100%;width:0;background:var(--acc);transition:width .2s}
+.note{font-size:12px;color:var(--mut);margin:6px 0 0}
+#cropM{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:25;display:flex;align-items:center;justify-content:center;padding:10px}
+#cropM[hidden]{display:none}
+#cropM .box{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;width:min(720px,100%);max-height:96vh;overflow:auto}
+#cropM h2{margin:0 0 8px;font-size:16px}
+#cropWrap{position:relative;margin:0 auto;touch-action:none;background:#000;line-height:0}
+#cropWrap canvas{display:block}
+#modal{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:20;display:flex;align-items:center;justify-content:center;padding:14px}
+#modal[hidden]{display:none}
+#modal .box{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px;width:min(460px,100%);max-height:92vh;overflow:auto}
+#modal h2{margin:0 0 12px;font-size:16px}
+.kv{display:grid;grid-template-columns:120px 1fr;gap:8px;align-items:center;margin:8px 0;font-size:13px}
+.kv label{color:var(--mut)}
+.big{font-variant-numeric:tabular-nums;color:var(--acc2)}
+.warn{color:var(--warn);font-size:12.5px}
+@media (max-width:520px){h1{display:none}header{justify-content:flex-end}}
+@media (max-width:820px){
+  main{flex-direction:column}
+  #stage{flex:none;height:56vh}
+  .tl{right:8px}
+  .tr{top:auto;bottom:8px;left:8px;right:8px;justify-content:flex-start}
+  #hint{display:none}
+  #panel{width:auto;flex:1;border-left:0;border-top:1px solid var(--line)}
+  h1{font-size:14px}
+  .hb .btn{padding:5px 9px;font-size:13px}
+  .seg button{padding:6px 8px}
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>Atelier de <span>recalage</span></h1>
+  <div class="hb">
+    <label class="btn">Image d’ensemble<input type="file" id="fBase" accept="image/*" hidden></label>
+    <label class="btn dis" id="lblDet">+ Détails<input type="file" id="fDet" accept="image/*" multiple hidden></label>
+    <button class="btn primary dis" id="bExport">Exporter</button>
+  </div>
+</header>
+<main>
+  <section id="stage">
+    <canvas id="gl"></canvas>
+    <canvas id="ov"></canvas>
+    <div id="empty"><div class="card">
+      <h2>Commencez par la photo d’ensemble</h2>
+      <p>Chargez la vue générale du tableau, puis ajoutez vos prises de vue de détail : elles seront localisées automatiquement, puis ajustables point par point.</p>
+      <label class="btn primary">Choisir la photo d’ensemble<input type="file" id="fBase2" accept="image/*" hidden></label>
+      <p style="margin:12px 0 0;font-size:12px">ou glissez-déposez les fichiers ici</p>
+    </div></div>
+    <div class="tb tl" id="tools" hidden>
+      <div class="seg" id="segTool">
+        <button data-v="view" class="on" title="Se déplacer dans l’image">Vue</button>
+        <button data-v="corners" title="Déformer en perspective par les 4 coins">Coins</button>
+        <button data-v="grid" title="Corriger localement avec 5 points supplémentaires">Grille</button>
+        <button data-v="erase" title="Effacer une partie du détail sélectionné en traçant un rectangle">Gomme</button>
+      </div>
+      <button class="btn sm" id="bEUndo" hidden title="Annuler la dernière zone effacée">↶ Annuler</button>
+      <button class="btn sm on" id="bShow" title="Afficher / masquer tous les détails (touche H)">Détails : visibles</button>
+      <button class="btn sm" id="bCover" title="Colorier la zone du tableau couverte par les détails (touche Z)">Zone couverte</button>
+      <button class="btn sm on" id="bScale" title="Afficher / masquer les échelles métriques (touche E)">Échelles</button>
+      <button class="btn sm" id="bFit" title="Ajuster la vue">⤢ Ajuster</button>
+    </div>
+    <div class="tb tr" id="modes" hidden>
+      <div class="seg" id="segMode">
+        <button data-v="normal" class="on">Normal</button>
+        <button data-v="diff" title="Différence avec ce qui se trouve dessous : plus c’est noir, mieux c’est calé">Différence</button>
+        <button data-v="curtain" title="Rideau : comparer avant/après en glissant">Rideau</button>
+      </div>
+      <div class="mini" id="miniDiff" hidden>gain <input type="range" id="rGain" min="1" max="10" step="0.5" value="3"></div>
+      <div class="mini" id="miniCurt" hidden>rideau <input type="range" id="rSplit" min="0" max="1" step="0.005" value="0.5"></div>
+    </div>
+    <div id="hint" hidden></div>
+  </section>
+  <aside id="panel">
+    <div class="sec">
+      <h3>État</h3>
+      <div id="status">Prêt.</div>
+      <div id="bar"><i></i></div>
+    </div>
+    <div class="sec" id="secScale">
+      <h3>Échelle métrique</h3>
+      <div class="note" id="scaleInfo" style="margin:0 0 8px">Non étalonnée : mesurez une longueur connue sur l’image d’ensemble pour obtenir des échelles en cm.</div>
+      <div class="row"><button class="btn sm primary" id="bCalib">Étalonner</button></div>
+      <div id="calibForm" hidden style="margin-top:8px">
+        <p class="note" id="calibHint" style="margin:0 0 6px"></p>
+        <div class="row" id="calRow" hidden>
+          <input type="number" id="calLen" min="0" step="any" placeholder="Longueur réelle (cm)" style="width:130px">
+          <span style="color:var(--mut)">cm</span>
+          <button class="btn sm primary" id="calOk">Valider</button>
+        </div>
+        <div class="row" style="margin-top:6px"><button class="btn sm" id="calCancel">Annuler</button></div>
+      </div>
+    </div>
+    <div class="sec">
+      <h3>Calques de détail</h3>
+      <div id="list"></div>
+      <p class="note" id="listEmpty">Aucun détail pour l’instant. Utilisez « + Détails » (sélection multiple possible).</p>
+    </div>
+    <div class="sec" id="ctl" hidden>
+      <h3>Détail sélectionné</h3>
+      <input type="text" id="tName" aria-label="Nom du calque">
+      <p class="note" id="resInfo" style="margin:6px 0 0"></p>
+      <div class="row" style="margin-top:8px">
+        <button class="btn sm primary" id="bLocate" title="Retrouver automatiquement l’emplacement du détail">Localiser</button>
+        <button class="btn sm" id="bRefine" title="Affiner finement la position actuelle (corrélation)">Affiner</button>
+        <button class="btn sm" id="bLock" title="Verrouiller / déverrouiller ce détail (empêche tout déplacement)">Verrouiller</button>
+        <button class="btn sm" id="bZoom">Zoom</button>
+        <button class="btn sm" id="bRotL" title="Pivoter le détail de 90° vers la gauche">↺ 90°</button>
+        <button class="btn sm" id="bRotR" title="Pivoter le détail de 90° vers la droite">↻ 90°</button>
+        <button class="btn sm danger" id="bDel">Supprimer</button>
+      </div>
+      <div class="f"><label>Fondu des bords</label><input type="range" id="rFe" min="0" max="0.15" step="0.005"><output id="oFe"></output></div>
+
+      <h3 style="margin-top:14px">Colorimétrie</h3>
+      <div class="row">
+        <button class="btn sm primary" id="bColor" title="Ajuste les couleurs du détail sur celles de l’image située dessous">Caler les couleurs</button>
+        <select id="sColor" style="width:auto"><option value="diag">gain + décalage / canal</option><option value="full">matrice 3×3</option></select>
+        <button class="btn sm" id="bLC" title="Ajuste seulement la luminosité et le contraste (un gain et un décalage communs aux 3 canaux, teintes préservées)">Luminosité / contraste</button>
+        <button class="btn sm" id="bColorReset">Réinit.</button>
+      </div>
+      <div class="f" style="margin-top:8px"><label>Opacité</label><input type="range" id="rOp" min="0" max="1" step="0.01"><output id="oOp"></output></div>
+      <div class="f"><label>Luminosité</label><input type="range" id="rEv" min="-1.5" max="1.5" step="0.01"><output id="oEv"></output></div>
+      <div class="f"><label>Contraste</label><input type="range" id="rCo" min="0.6" max="1.6" step="0.01"><output id="oCo"></output></div>
+      <div class="f"><label>Saturation</label><input type="range" id="rSa" min="0" max="2" step="0.01"><output id="oSa"></output></div>
+      <div class="f"><label>Chaleur</label><input type="range" id="rWa" min="-0.3" max="0.3" step="0.005"><output id="oWa"></output></div>
+      <div class="f"><label>Teinte (vert/magenta)</label><input type="range" id="rTi" min="-0.3" max="0.3" step="0.005"><output id="oTi"></output></div>
+
+      <h3 style="margin-top:14px">Déformation</h3>
+      <div class="row">
+        <button class="btn sm" id="bGridReset">Remettre la grille à plat</button>
+      </div>
+      <p class="note">Mode « Coins » : perspective exacte par 4 points. Mode « Grille » : 5 points en plus pour corriger distorsion d’objectif ou toile gondolée.</p>
+    </div>
+  </aside>
+</main>
+
+<div id="cropM" hidden><div class="box">
+  <h2>Recadrer, redresser et redimensionner l’image d’ensemble</h2>
+  <div id="cropWrap"><canvas id="cropC"></canvas></div>
+  <div class="note" style="margin:8px 0">Placez chaque poignée sur un coin du tableau (indépendamment) : l’image est redressée en rectangle parfait. Glissez à l’intérieur pour déplacer le cadre.</div>
+  <div class="kv"><label>Taille</label><div class="row" style="gap:8px;flex-wrap:wrap"><span>Grand côté</span><input type="number" id="cropMax" min="200" step="100" style="width:90px"><span>px</span><button class="btn sm" id="cropOrig">Taille d’origine</button></div></div>
+  <div class="kv"><label>Dimensions réelles</label><div><div class="row" style="gap:6px;flex-wrap:wrap"><input type="number" id="cropRW" min="1" step="any" placeholder="largeur" style="width:80px"><span>×</span><input type="number" id="cropRH" min="1" step="any" placeholder="hauteur" style="width:80px"><span>cm</span></div><div class="note">Mesures du tableau (cadre du recadrage = bords du tableau). Elles fixent les proportions et étalonnent l’échelle en cm. Une seule valeur suffit pour l’échelle.</div></div></div>
+  <div class="note" id="cropInfo"></div>
+  <div class="row" style="margin-top:12px;justify-content:space-between">
+    <button class="btn sm" id="cropReset">Réinitialiser</button>
+    <span class="row"><button class="btn" id="cropCancel">Annuler</button><button class="btn primary" id="cropOk">Valider</button></span>
+  </div>
+</div></div>
+
+<div id="modal" hidden><div class="box">
+  <h2>Exporter l’image haute résolution</h2>
+  <div class="kv"><label>Zone</label><select id="eZone"><option value="all">Tout le tableau</option><option value="det">Emprise des détails</option></select></div>
+  <div class="kv"><label>Fond</label><select id="eBg"><option value="base">Image d’ensemble sous les détails</option><option value="none">Transparent (détails seuls, PNG)</option></select></div>
+  <div class="kv"><label>Échelle</label><div><input type="number" id="eScale" min="0.25" max="40" step="0.25"><div class="note" id="eInfo"></div></div></div>
+  <div class="kv"><label>Format</label><select id="eFmt"><option value="png">PNG (sans perte)</option><option value="jpg">JPEG</option></select></div>
+  <div class="kv" id="eQRow"><label>Qualité JPEG</label><input type="range" id="eQ" min="0.5" max="1" step="0.01" value="0.95"></div>
+  <div class="kv" id="eBarRow"><label>Échelle</label><label style="color:var(--tx)"><input type="checkbox" id="eScaleBar" checked> graphique sur l’image</label></div>
+  <div class="warn" id="eWarn"></div>
+  <div id="eBarWrap" style="display:none;margin-top:10px"><div id="bar2" style="height:6px;background:var(--panel2);border-radius:3px;overflow:hidden"><i style="display:block;height:100%;width:0;background:var(--acc)"></i></div><div class="note" id="eStat"></div></div>
+  <div class="row" style="margin-top:14px;justify-content:space-between">
+    <button class="btn sm" id="eJson">Enregistrer les réglages (.json)</button>
+    <span class="row"><button class="btn" id="eCancel">Fermer</button><button class="btn primary" id="eGo">Générer</button></span>
+  </div>
+</div></div>
+
+<script>
+'use strict';
+/* ============================================================
+   Atelier de recalage — superposition de détails sur une vue d’ensemble
+   WebGL2 pour l’affichage/l’export, OpenCV.js (ORB + ECC) pour la localisation
+   ============================================================ */
+const $=s=>document.querySelector(s);
+const tick=(ms=16)=>new Promise(r=>setTimeout(r,ms));
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const S={base:null,layers:[],sel:null,tool:'view',mode:'normal',gain:3,split:.5,view:{x0:0,y0:0,z:1},dirty:true,nextId:1,showAll:true,showCover:false,showScale:true,pxPerMm:null,calib:{active:false,pts:[],ref:null},cv:null,cvState:'idle',busy:false,baseFeat:null};
+const dpr=()=>Math.min(window.devicePixelRatio||1,2.5);
+
+/* ---------- maths : homographies ---------- */
+function mul3(a,b){const c=new Array(9);for(let i=0;i<3;i++)for(let j=0;j<3;j++){let s=0;for(let k=0;k<3;k++)s+=a[i*3+k]*b[k*3+j];c[i*3+j]=s}return c}
+function inv3(m){const[a,b,c,d,e,f,g,h,i]=m;const A=e*i-f*h,B=-(d*i-f*g),C=d*h-e*g;const det=a*A+b*B+c*C;if(Math.abs(det)<1e-18)return null;
+  return[A/det,-(b*i-c*h)/det,(b*f-c*e)/det,B/det,(a*i-c*g)/det,-(a*f-c*d)/det,C/det,-(a*h-b*g)/det,(a*e-b*d)/det]}
+function applyH(H,x,y){const w=H[6]*x+H[7]*y+H[8];return[(H[0]*x+H[1]*y+H[2])/w,(H[3]*x+H[4]*y+H[5])/w]}
+// carré unité (TL,TR,BR,BL) -> quadrilatère (Heckbert)
+function hFromQuad(q){
+  const[x0,y0]=q[0],[x1,y1]=q[1],[x2,y2]=q[2],[x3,y3]=q[3];
+  const dx1=x1-x2,dx2=x3-x2,dx3=x0-x1+x2-x3,dy1=y1-y2,dy2=y3-y2,dy3=y0-y1+y2-y3;
+  let g=0,h=0;const den=dx1*dy2-dy1*dx2;
+  if(Math.abs(dx3)>1e-12||Math.abs(dy3)>1e-12){if(Math.abs(den)<1e-12)return null;g=(dx3*dy2-dy3*dx2)/den;h=(dx1*dy3-dy1*dx3)/den}
+  return[x1-x0+g*x1,x3-x0+h*x3,x0,y1-y0+g*y1,y3-y0+h*y3,y0,g,h,1];
+}
+function convexQuad(q){let s=0;for(let i=0;i<4;i++){const a=q[i],b=q[(i+1)%4],c=q[(i+2)%4];const z=(b[0]-a[0])*(c[1]-b[1])-(b[1]-a[1])*(c[0]-b[0]);if(Math.abs(z)<1e-9)return false;const sg=z>0?1:-1;if(!s)s=sg;else if(s!==sg)return false}return true}
+function quadArea(q){let a=0;for(let i=0;i<4;i++){const p=q[i],r=q[(i+1)%4];a+=p[0]*r[1]-r[0]*p[1]}return Math.abs(a)/2}
+function inPoly(p,poly){let c=false;for(let i=0,j=poly.length-1;i<poly.length;j=i++){const a=poly[i],b=poly[j];if((a[1]>p[1])!==(b[1]>p[1])&&p[0]<(b[0]-a[0])*(p[1]-a[1])/(b[1]-a[1])+a[0])c=!c}return c}
+
+/* ---------- WebGL ---------- */
+const glc=$('#gl'),ovc=$('#ov'),octx=ovc.getContext('2d');
+const gl=glc.getContext('webgl2',{antialias:false,alpha:false,preserveDrawingBuffer:false});
+if(!gl){setStatus('WebGL2 est indisponible sur cet appareil : l’application ne peut pas fonctionner.',true)}
+const MAXTEX=gl?gl.getParameter(gl.MAX_TEXTURE_SIZE):4096;
+const MAXRB=gl?Math.min(gl.getParameter(gl.MAX_RENDERBUFFER_SIZE),4096):2048;
+const aniso=gl&&(gl.getExtension('EXT_texture_filter_anisotropic'));
+const VS=`#version 300 es
+in vec2 a_uv;in vec2 a_dest;in float a_w;
+uniform vec2 u_origin,u_scale,u_off;
+out vec2 v_uv;
+void main(){vec2 n=u_off+(a_dest-u_origin)*u_scale;gl_Position=vec4(n*a_w,0.0,a_w);v_uv=a_uv;}`;
+const FS=`#version 300 es
+precision highp float;
+uniform sampler2D u_tex;uniform sampler2D u_under;uniform sampler2D u_mask;uniform int u_hasMask;
+uniform mat3 u_M;uniform vec3 u_b;uniform vec3 u_adj;uniform vec2 u_adj2;
+uniform float u_opacity;uniform vec2 u_fe;
+uniform int u_mode;uniform float u_gain;uniform vec2 u_res;uniform float u_split;uniform int u_curtain;
+in vec2 v_uv;out vec4 o;
+void main(){
+  if(u_curtain==1&&gl_FragCoord.x<u_split)discard;
+  vec3 c=u_M*texture(u_tex,v_uv).rgb+u_b;
+  c*=u_adj.x;c=(c-0.5)*u_adj.y+0.5;
+  float l=dot(c,vec3(0.299,0.587,0.114));c=mix(vec3(l),c,u_adj.z);
+  c.r*=1.0+u_adj2.x;c.b*=1.0-u_adj2.x;c.g*=1.0+u_adj2.y;
+  c=clamp(c,0.0,1.0);
+  float mk=u_hasMask==1?texture(u_mask,v_uv).r:1.0;
+  if(u_mode==1){if(mk<0.5)discard;vec3 un=texture(u_under,gl_FragCoord.xy/u_res).rgb;o=vec4(clamp(abs(un-c)*u_gain,0.0,1.0),1.0);return;}
+  vec2 d=min(v_uv,1.0-v_uv);vec2 f=clamp(d/u_fe,0.0,1.0);
+  float a=u_opacity*mk*smoothstep(0.0,1.0,min(f.x,f.y));
+  o=vec4(c,a);
+}`;
+let P,U={};
+function sh(t,src){const s=gl.createShader(t);gl.shaderSource(s,src);gl.compileShader(s);if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))throw new Error(gl.getShaderInfoLog(s));return s}
+let dummyMask=null,underTex=null,fbo=null,fboTex=null,fboW=0,fboH=0,underW=0,underH=0;
+if(gl){
+  P=gl.createProgram();gl.attachShader(P,sh(gl.VERTEX_SHADER,VS));gl.attachShader(P,sh(gl.FRAGMENT_SHADER,FS));
+  gl.bindAttribLocation(P,0,'a_uv');gl.bindAttribLocation(P,1,'a_dest');gl.bindAttribLocation(P,2,'a_w');
+  gl.linkProgram(P);if(!gl.getProgramParameter(P,gl.LINK_STATUS))throw new Error(gl.getProgramInfoLog(P));
+  for(const n of['u_origin','u_scale','u_off','u_tex','u_under','u_mask','u_hasMask','u_M','u_b','u_adj','u_adj2','u_opacity','u_fe','u_mode','u_gain','u_res','u_split','u_curtain'])U[n]=gl.getUniformLocation(P,n);
+  gl.useProgram(P);gl.uniform1i(U.u_tex,0);gl.uniform1i(U.u_under,1);gl.uniform1i(U.u_mask,2);
+  dummyMask=gl.createTexture();gl.activeTexture(gl.TEXTURE2);gl.bindTexture(gl.TEXTURE_2D,dummyMask);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,1,1,0,gl.RGBA,gl.UNSIGNED_BYTE,new Uint8Array([255,255,255,255]));gl.activeTexture(gl.TEXTURE0);
+  underTex=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,underTex);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.NEAREST);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+}
+function downscaleCanvas(src,w,h){ // réduction par paliers (qualité)
+  let cw=src.width,ch=src.height,cur=src;
+  while(cw/2>=w&&ch/2>=h){const c=document.createElement('canvas');c.width=cw=Math.max(1,Math.floor(cw/2));c.height=ch=Math.max(1,Math.floor(ch/2));const x=c.getContext('2d');x.imageSmoothingQuality='high';x.drawImage(cur,0,0,cw,ch);cur=c}
+  const c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d');x.imageSmoothingQuality='high';x.drawImage(cur,0,0,w,h);return c;
+}
+function makeTexture(bmp,isBase){
+  let src=bmp,note=null;
+  const cap=/iPhone|iPad|Android/i.test(navigator.userAgent)?Math.min(MAXTEX,isBase?4096:2560):MAXTEX;
+  if(bmp.width>cap||bmp.height>cap){const k=cap/Math.max(bmp.width,bmp.height);src=downscaleCanvas(bmp,Math.floor(bmp.width*k),Math.floor(bmp.height*k));note='réduite à '+src.width+'×'+src.height+' pour économiser la mémoire'}
+  const t=gl.createTexture();gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,t);
+  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,false);
+  gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA8,gl.RGBA,gl.UNSIGNED_BYTE,src);
+  gl.generateMipmap(gl.TEXTURE_2D);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR_MIPMAP_LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+  if(aniso)gl.texParameterf(gl.TEXTURE_2D,aniso.TEXTURE_MAX_ANISOTROPY_EXT,Math.min(8,gl.getParameter(aniso.MAX_TEXTURE_MAX_ANISOTROPY_EXT)));
+  return {tex:t,note};
+}
+/* maillage d’un calque : (u,v) -> destination en px de l’image d’ensemble, avec w projectif pour une interpolation exacte */
+function gridOffset(L,u,v){
+  if(!L.grid)return[0,0];
+  const fx=u*2,fy=v*2,i=Math.min(1,Math.floor(fx)),j=Math.min(1,Math.floor(fy)),tx=fx-i,ty=fy-j;
+  const g=(a,b)=>L.grid[b*3+a];
+  const m=(k)=>{const a=g(i,j)[k]*(1-tx)+g(i+1,j)[k]*tx,b=g(i,j+1)[k]*(1-tx)+g(i+1,j+1)[k]*tx;return a*(1-ty)+b*ty};
+  return[m(0),m(1)];
+}
+function layerPoint(L,u,v){const H=L.H,w=H[6]*u+H[7]*v+H[8];const o=gridOffset(L,u,v);return[(H[0]*u+H[1]*v+H[2])/w+o[0],(H[3]*u+H[4]*v+H[5])/w+o[1],w]}
+function hasGrid(L){return !!L.grid&&L.grid.some(o=>o[0]!==0||o[1]!==0)}
+function buildMesh(L){
+  const N=hasGrid(L)?14:1,n1=N+1,vb=new Float32Array(n1*n1*5);let k=0;
+  for(let j=0;j<=N;j++)for(let i=0;i<=N;i++){const u=i/N,v=j/N,p=layerPoint(L,u,v);vb[k++]=u;vb[k++]=v;vb[k++]=p[0];vb[k++]=p[1];vb[k++]=p[2]}
+  const ib=new Uint16Array(N*N*6);k=0;
+  for(let j=0;j<N;j++)for(let i=0;i<N;i++){const a=j*n1+i,b=a+1,c=a+n1,d=c+1;ib[k++]=a;ib[k++]=b;ib[k++]=c;ib[k++]=b;ib[k++]=d;ib[k++]=c}
+  if(!L.vao){L.vao=gl.createVertexArray();L.vbo=gl.createBuffer();L.ibo=gl.createBuffer()}
+  gl.bindVertexArray(L.vao);
+  gl.bindBuffer(gl.ARRAY_BUFFER,L.vbo);gl.bufferData(gl.ARRAY_BUFFER,vb,gl.DYNAMIC_DRAW);
+  gl.enableVertexAttribArray(0);gl.vertexAttribPointer(0,2,gl.FLOAT,false,20,0);
+  gl.enableVertexAttribArray(1);gl.vertexAttribPointer(1,2,gl.FLOAT,false,20,8);
+  gl.enableVertexAttribArray(2);gl.vertexAttribPointer(2,1,gl.FLOAT,false,20,16);
+  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,L.ibo);gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,ib,gl.DYNAMIC_DRAW);
+  L.nidx=ib.length;gl.bindVertexArray(null);
+}
+/* ---------- gomme : masque par détail ---------- */
+const maskMax=()=>MOBILE?1024:1536;
+function ensureMask(L){
+  if(L.maskC)return;
+  const k=Math.min(1,maskMax()/Math.max(L.w,L.h)),c=document.createElement('canvas');c.width=Math.max(8,Math.round(L.w*k));c.height=Math.max(8,Math.round(L.h*k));
+  const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);L.maskC=c;L.maskUndo=[];
+  L.maskTex=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,L.maskTex);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+}
+function uploadMask(L){gl.bindTexture(gl.TEXTURE_2D,L.maskTex);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,L.maskC);L.maskOn=true;S.dirty=true}
+function applyErase(L,poly,restore){ // poly : points écran (px CSS) ; efface (ou restaure) la partie du détail qui s’y trouve
+  ensureMask(L);const c=L.maskC,mw=c.width,mh=c.height,ctx=c.getContext('2d',{willReadFrequently:true});
+  const img=ctx.getImageData(0,0,mw,mh);
+  L.maskUndo.push(new Uint8ClampedArray(img.data));if(L.maskUndo.length>(MOBILE?4:6))L.maskUndo.shift();
+  const D=img.data,val=restore?255:0,STEP=8,gx=Math.ceil(mw/STEP)+1,gy=Math.ceil(mh/STEP)+1,P=new Float32Array(gx*gy*2);
+  for(let j=0;j<gy;j++)for(let i=0;i<gx;i++){const q=layerPoint(L,Math.min(1,i*STEP/mw),Math.min(1,j*STEP/mh)),sp=o2s(q[0],q[1]);P[(j*gx+i)*2]=sp[0];P[(j*gx+i)*2+1]=sp[1]}
+  let bx0=1e9,by0=1e9,bx1=-1e9,by1=-1e9;for(const q of poly){bx0=Math.min(bx0,q[0]);by0=Math.min(by0,q[1]);bx1=Math.max(bx1,q[0]);by1=Math.max(by1,q[1])}
+  for(let j=0;j<gy-1;j++)for(let i=0;i<gx-1;i++){
+    const a=(j*gx+i)*2,b=a+2,cc=a+gx*2,d=cc+2;
+    const mnx=Math.min(P[a],P[b],P[cc],P[d]),mxx=Math.max(P[a],P[b],P[cc],P[d]),mny=Math.min(P[a+1],P[b+1],P[cc+1],P[d+1]),mxy=Math.max(P[a+1],P[b+1],P[cc+1],P[d+1]);
+    if(mxx<bx0||mnx>bx1||mxy<by0||mny>by1)continue;
+    for(let y=j*STEP;y<Math.min(mh,(j+1)*STEP);y++){const fy=(y+.5-j*STEP)/STEP;
+      for(let x=i*STEP;x<Math.min(mw,(i+1)*STEP);x++){const fx=(x+.5-i*STEP)/STEP;
+        const sx=(P[a]*(1-fx)+P[b]*fx)*(1-fy)+(P[cc]*(1-fx)+P[d]*fx)*fy,sy=(P[a+1]*(1-fx)+P[b+1]*fx)*(1-fy)+(P[cc+1]*(1-fx)+P[d+1]*fx)*fy;
+        if(sx<bx0||sx>bx1||sy<by0||sy>by1)continue;
+        if(inPoly([sx,sy],poly)){const o=(y*mw+x)*4;D[o]=D[o+1]=D[o+2]=val}}}
+  }
+  ctx.putImageData(img,0,0);uploadMask(L);
+}
+function undoErase(L){if(!L||!L.maskC||!L.maskUndo.length)return;const c=L.maskC,ctx=c.getContext('2d'),img=ctx.getImageData(0,0,c.width,c.height);img.data.set(L.maskUndo.pop());ctx.putImageData(img,0,0);uploadMask(L)}
+function resetErase(L){if(!L||!L.maskC)return;const c=L.maskC,ctx=c.getContext('2d');L.maskUndo.push(new Uint8ClampedArray(ctx.getImageData(0,0,c.width,c.height).data));if(L.maskUndo.length>(MOBILE?4:6))L.maskUndo.shift();ctx.fillStyle='#fff';ctx.fillRect(0,0,c.width,c.height);uploadMask(L);L.maskOn=false;S.dirty=true}
+function updateLayer(L){const H=hFromQuad(L.corners);if(H)L.H=H;buildMesh(L);S.dirty=true;if(S.pxPerMm&&L===selLayer())updResInfo(L)}
+const IDM=[1,0,0,0,1,0,0,0,1];
+const colM=M=>[M[0],M[3],M[6],M[1],M[4],M[7],M[2],M[5],M[8]]; // ligne→colonne
+function drawLayerGL(L,view,o={}){
+  gl.useProgram(P);
+  gl.uniform2f(U.u_origin,view.origin[0],view.origin[1]);gl.uniform2f(U.u_scale,view.scale[0],view.scale[1]);gl.uniform2f(U.u_off,view.off[0],view.off[1]);
+  gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,L.tex);
+  gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,underTex);
+  const raw=o.raw||L.isBase,hm=!raw&&L.maskOn&&L.maskTex;
+  gl.activeTexture(gl.TEXTURE2);gl.bindTexture(gl.TEXTURE_2D,hm?L.maskTex:dummyMask);gl.uniform1i(U.u_hasMask,hm?1:0);gl.activeTexture(gl.TEXTURE0);
+  if(raw){gl.uniformMatrix3fv(U.u_M,false,IDM);gl.uniform3f(U.u_b,0,0,0);gl.uniform3f(U.u_adj,1,1,1);gl.uniform2f(U.u_adj2,0,0);gl.uniform1f(U.u_opacity,1);gl.uniform2f(U.u_fe,1e-6,1e-6)}
+  else{
+    const c=L.color,M=c.fit?c.fit.M:IDM,b=c.fit?c.fit.b:[0,0,0];
+    gl.uniformMatrix3fv(U.u_M,false,colM(M));gl.uniform3f(U.u_b,b[0],b[1],b[2]);
+    gl.uniform3f(U.u_adj,Math.pow(2,c.ev),c.contrast,c.sat);gl.uniform2f(U.u_adj2,c.warm,c.tint);
+    gl.uniform1f(U.u_opacity,L.opacity);
+    const dw=L.w,dh=L.h,fp=L.feather*Math.min(dw,dh);gl.uniform2f(U.u_fe,Math.max(1e-6,fp/dw),Math.max(1e-6,fp/dh));
+  }
+  gl.uniform1i(U.u_mode,o.diff?1:0);gl.uniform1f(U.u_gain,S.gain);gl.uniform2f(U.u_res,o.resW||1,o.resH||1);
+  gl.uniform1i(U.u_curtain,o.curtain?1:0);gl.uniform1f(U.u_split,o.split||0);
+  gl.bindVertexArray(L.vao);gl.drawElements(gl.TRIANGLES,L.nidx,gl.UNSIGNED_SHORT,0);gl.bindVertexArray(null);
+}
+function blendOn(){gl.enable(gl.BLEND);gl.blendFuncSeparate(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA,gl.ONE,gl.ONE_MINUS_SRC_ALPHA)}
+/* rendu hors écran d’une zone de l’image d’ensemble -> RGBA (lignes de haut en bas) */
+function ensureFBO(w,h){
+  if(fbo&&fboW===w&&fboH===h)return;
+  if(!fbo){fbo=gl.createFramebuffer();fboTex=gl.createTexture()}
+  gl.bindTexture(gl.TEXTURE_2D,fboTex);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA8,w,h,0,gl.RGBA,gl.UNSIGNED_BYTE,null);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.NEAREST);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.NEAREST);
+  gl.bindFramebuffer(gl.FRAMEBUFFER,fbo);gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_2D,fboTex,0);
+  fboW=w;fboH=h;
+}
+function renderRegion({ox,oy,sx,sy,outW,outH,list}){
+  ensureFBO(outW,outH);
+  gl.bindFramebuffer(gl.FRAMEBUFFER,fbo);gl.viewport(0,0,outW,outH);
+  gl.clearColor(0,0,0,0);gl.clear(gl.COLOR_BUFFER_BIT);blendOn();
+  const view={origin:[ox,oy],scale:[2*sx/outW,2*sy/outH],off:[-1,-1]};
+  for(const it of list)drawLayerGL(it.L,view,{raw:it.raw});
+  const buf=new Uint8Array(outW*outH*4);gl.readPixels(0,0,outW,outH,gl.RGBA,gl.UNSIGNED_BYTE,buf);
+  gl.bindFramebuffer(gl.FRAMEBUFFER,null);return buf;
+}
+
+/* ---------- affichage ---------- */
+function resize(){
+  const st=$('#stage'),w=st.clientWidth,h=st.clientHeight,d=dpr();
+  for(const c of[glc,ovc]){c.width=Math.max(1,Math.round(w*d));c.height=Math.max(1,Math.round(h*d))}
+  if(gl&&(underW!==glc.width||underH!==glc.height)){underW=glc.width;underH=glc.height;gl.bindTexture(gl.TEXTURE_2D,underTex);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGB8,underW,underH,0,gl.RGB,gl.UNSIGNED_BYTE,null)}
+  S.dirty=true;
+}
+function fitView(){
+  if(!S.base)return;const w=$('#stage').clientWidth,h=$('#stage').clientHeight,m=24;
+  const z=Math.min((w-m)/S.base.w,(h-m)/S.base.h);S.view.z=z;S.view.x0=S.base.w/2-w/2/z;S.view.y0=S.base.h/2-h/2/z;S.dirty=true;
+}
+const s2o=(px,py)=>[S.view.x0+px/S.view.z,S.view.y0+py/S.view.z];
+const o2s=(x,y)=>[(x-S.view.x0)*S.view.z,(y-S.view.y0)*S.view.z];
+function zoomAt(px,py,f){const o=s2o(px,py);const z=clamp(S.view.z*f,0.02,60);S.view.z=z;S.view.x0=o[0]-px/z;S.view.y0=o[1]-py/z;S.dirty=true}
+const vis=L=>L.visible&&S.showAll;
+const selLayer=()=>S.layers.find(l=>l.id===S.sel)||null;
+function render(){
+  S.dirty=false;if(!gl)return;
+  const cw=glc.width,ch=glc.height;gl.bindFramebuffer(gl.FRAMEBUFFER,null);gl.viewport(0,0,cw,ch);
+  gl.disable(gl.BLEND);gl.clearColor(.055,.058,.063,1);gl.clear(gl.COLOR_BUFFER_BIT);
+  if(S.base){
+    const s=S.view.z*dpr(),view={origin:[S.view.x0,S.view.y0],scale:[2*s/cw,-2*s/ch],off:[-1,1]};
+    if(!S.baseHidden)drawLayerGL(S.base,view);blendOn();
+    const sl=selLayer(),o2={resW:cw,resH:ch};
+    for(const L of S.layers){
+      if(!vis(L))continue;
+      if(S.mode==='diff'&&L===sl)continue;
+      if(S.mode==='curtain'&&L===sl)drawLayerGL(L,view,{curtain:true,split:S.split*cw});
+      else drawLayerGL(L,view,o2);
+    }
+    if(S.mode==='diff'&&sl&&vis(sl)){
+      gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,underTex);gl.copyTexSubImage2D(gl.TEXTURE_2D,0,0,0,0,0,cw,ch);
+      gl.disable(gl.BLEND);drawLayerGL(sl,view,{diff:true,resW:cw,resH:ch});
+    }
+  }
+  drawOverlay();
+}
+function polyScreen(L,n=12){
+  const pts=[];const edges=[[[0,0],[1,0]],[[1,0],[1,1]],[[1,1],[0,1]],[[0,1],[0,0]]];
+  for(const[a,b]of edges){const m=hasGrid(L)?n:1;for(let i=0;i<m;i++){const t=i/m;const p=layerPoint(L,a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t);pts.push(o2s(p[0],p[1]))}}
+  return pts;
+}
+function handles(L){ // [{kind,idx,u,v,p:[sx,sy]}]
+  if(L.locked||L.noBorder||S.tool==='erase')return[];const h=[];const cs=[[0,0],[1,0],[1,1],[0,1]];
+  cs.forEach((c,i)=>{const p=layerPoint(L,c[0],c[1]);h.push({kind:'c',idx:i,p:o2s(p[0],p[1])})});
+  if(S.tool==='grid'){const nodes=[[1,0],[0,1],[1,1],[2,1],[1,2]];nodes.forEach(([a,b])=>{const p=layerPoint(L,a/2,b/2);h.push({kind:'g',idx:b*3+a,u:a/2,v:b/2,p:o2s(p[0],p[1])})})}
+  return h;
+}
+/* ---------- échelle métrique ---------- */
+const fr=(v,d=2)=>v.toLocaleString('fr-FR',{maximumFractionDigits:d});
+function fmtLen(mm){return fr(mm/10)+' cm'}
+function barSegs(v){for(const k of[5,4,3,6,2,7,8,10]){const sv=v/k,e=Math.pow(10,Math.floor(Math.log10(sv)+1e-9)),m=sv/e;if([1,2,2.5,5].some(x=>Math.abs(m-x)<1e-6))return k}return 5}
+function niceCands(){const a=[];for(let k=-3;k<=7;k++)for(const m of[1,1.2,1.4,1.6,1.8,2,2.5,3,3.5,4,4.5,5,6,7,8,9])a.push(+(m*Math.pow(10,k)).toPrecision(6));return a}
+const NICE=niceCands();
+function pickBar(pxmm,minPx,maxPx){let b=null;for(const v of NICE){const len=v*pxmm;if(len>=minPx&&len<=maxPx&&(!b||len>b.len))b={v,len}}return b}
+function pickBarMin(pxmm,minPx){for(const v of NICE){const len=v*pxmm;if(len>=minPx)return{v,len}}return null}
+function edgeOv(L,u0,v0,u1,v1){const a=layerPoint(L,u0,v0),b=layerPoint(L,u1,v1);return Math.hypot(a[0]-b[0],a[1]-b[1])}
+function layerRes(L){const w=(edgeOv(L,0,0,1,0)+edgeOv(L,0,1,1,1))/2,h=(edgeOv(L,0,0,0,1)+edgeOv(L,1,0,1,1))/2;return{w,h,pxmm:L.w/w*S.pxPerMm}}
+function updResInfo(L){
+  const el=$('#resInfo');if(!el)return;if(!L||!S.pxPerMm){el.textContent='';return}
+  const r=layerRes(L);el.textContent=`Emprise ≈ ${fmtLen(r.w/S.pxPerMm)} × ${fmtLen(r.h/S.pxPerMm)}`;
+}
+function updScaleInfo(){
+  const el=$('#scaleInfo');
+  if(S.pxPerMm&&S.base){el.textContent=`Échelle enregistrée. Champ de l’image d’ensemble : ${fmtLen(S.base.w/S.pxPerMm)} × ${fmtLen(S.base.h/S.pxPerMm)}. Les détails en héritent automatiquement. Valable dans le plan du tableau.`;$('#bCalib').textContent='Rétalonner'}
+  else{el.textContent='Non étalonnée : mesurez une longueur connue (en cm) sur l’image d’ensemble — règle visible, largeur du châssis… — pour obtenir des échelles graduées.';$('#bCalib').textContent='Étalonner'}
+  $('#bScale').classList.toggle('on',S.showScale);updResInfo(selLayer());
+}
+function syncCalib(){
+  const c=S.calib,f=$('#calibForm');f.hidden=!c.active;if(!c.active)return;
+  $('#calRow').hidden=c.pts.length<2;
+  $('#calibHint').textContent=c.pts.length<2?`Point ${c.pts.length+1}/2 : touchez l’image à l’extrémité d’une longueur connue. Zoomez pour plus de précision.`:'Glissez les deux points pour les ajuster, puis saisissez la longueur réelle.';
+}
+$('#bCalib').onclick=()=>{if(!S.base){setStatus('Chargez d’abord la photo d’ensemble.',true);return}S.calib.active=true;S.calib.pts=[];syncCalib();S.dirty=true;setStatus('Étalonnage : placez deux points sur l’image d’ensemble.')};
+$('#calCancel').onclick=()=>{S.calib.active=false;S.calib.pts=[];syncCalib();S.dirty=true};
+$('#calOk').onclick=()=>{
+  const c=S.calib,len=parseFloat($('#calLen').value),u=10;
+  if(c.pts.length<2||!(len>0)){setStatus('Saisissez une longueur réelle positive.',true);return}
+  const dist=Math.hypot(c.pts[0][0]-c.pts[1][0],c.pts[0][1]-c.pts[1][1]);if(dist<4){setStatus('Les deux points sont trop proches.',true);return}
+  S.pxPerMm=dist/(len*u);c.ref={pts:c.pts.map(q=>q.slice()),mm:len*u};c.active=false;c.pts=[];S.showScale=true;syncCalib();updScaleInfo();S.dirty=true;
+  setStatus('Échelle enregistrée (en cm).');
+};
+function toggleScale(){S.showScale=!S.showScale;updScaleInfo();S.dirty=true}
+$('#bScale').onclick=toggleScale;
+window.addEventListener('keydown',e=>{if((e.key==='e'||e.key==='E')&&!e.ctrlKey&&!e.metaKey&&!/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)&&S.base)toggleScale()});
+function drawBarScreen(a,b,v,n){ // barre graduée alternée noir/blanc, unité unique : cm
+  const dx=b[0]-a[0],dy=b[1]-a[1],l=Math.hypot(dx,dy)||1,ux=dx/l,uy=dy/l,th=7,px=-uy*th/2,py=ux*th/2,k=barSegs(v);
+  const P=(t,sd)=>[a[0]+ux*l*t+px*sd,a[1]+uy*l*t+py*sd];
+  const poly=q=>{octx.beginPath();q.forEach((c,i)=>i?octx.lineTo(c[0],c[1]):octx.moveTo(c[0],c[1]));octx.closePath()};
+  octx.lineJoin='round';
+  for(let i=0;i<k;i++){poly([P(i/k,1),P((i+1)/k,1),P((i+1)/k,-1),P(i/k,-1)]);octx.fillStyle=i%2?'#fff':'#111';octx.fill()}
+  poly([P(0,1),P(1,1),P(1,-1),P(0,-1)]);octx.strokeStyle='#111';octx.lineWidth=1.2;octx.stroke();
+  octx.font='600 12px system-ui,sans-serif';octx.textAlign='center';octx.textBaseline='middle';
+  const txt=(t,pt)=>{const x=pt[0]+n[0]*15,y=pt[1]+n[1]*15;octx.lineWidth=3.5;octx.strokeStyle='rgba(0,0,0,.8)';octx.strokeText(t,x,y);octx.fillStyle='#fff';octx.fillText(t,x,y)};
+  txt('0',P(0,0));txt(fmtLen(v),P(1,0));
+}
+function drawScales(){
+  if(S.calib.active||(S.showScale&&S.calib.ref)){ // segment d’étalonnage
+    const pts=S.calib.active?S.calib.pts:S.calib.ref.pts;
+    if(pts.length){const sp=pts.map(q=>o2s(q[0],q[1]));
+      if(sp.length===2){octx.beginPath();octx.moveTo(sp[0][0],sp[0][1]);octx.lineTo(sp[1][0],sp[1][1]);octx.setLineDash([5,4]);octx.strokeStyle='#5ab0ff';octx.lineWidth=1.5;octx.stroke();octx.setLineDash([])}
+      if(S.calib.active)for(const q of sp){octx.beginPath();octx.arc(q[0],q[1],7,0,6.2832);octx.fillStyle='rgba(90,176,255,.9)';octx.fill();octx.lineWidth=1.5;octx.strokeStyle='#111';octx.stroke()}
+      else if(sp.length===2){octx.font='600 11px system-ui,sans-serif';octx.textAlign='center';octx.fillStyle='#5ab0ff';octx.fillText('étalon : '+fmtLen(S.calib.ref.mm),(sp[0][0]+sp[1][0])/2,(sp[0][1]+sp[1][1])/2-8)}}
+  }
+  if(!S.showScale||!S.pxPerMm||!S.base)return;
+  const W=$('#stage').clientWidth,H=$('#stage').clientHeight,pxmm=S.pxPerMm*S.view.z;
+  const PADR=innerWidth<=820?58:76;octx.font='600 12px system-ui,sans-serif';
+  const nb=pickBar(pxmm,24,W/2-PADR-26); // la plus longue graduation qui tient dans la moitié droite
+  if(nb){ // alignée à droite sur la photo, avec marge droite ; reste dans la zone visible
+    const c=[o2s(0,0),o2s(S.base.w,0),o2s(S.base.w,S.base.h),o2s(0,S.base.h)],
+      ir=Math.max(...c.map(q=>q[0])),ib=Math.max(...c.map(q=>q[1])),il=Math.min(...c.map(q=>q[0]));
+    octx.font='600 12px system-ui,sans-serif';const hl=Math.ceil(octx.measureText(fmtLen(nb.v)).width/2)+2;
+    const x1=Math.min(W-PADR,ir-PADR)-hl,x0=x1-nb.len;
+    const yMax=innerWidth<=820?H-64:H-30,y=Math.max(60,Math.min(yMax,ib-28));
+    drawBarScreen([x0,y],[x1,y],nb.v,[0,-1]);
+  }
+}
+function polyOv(L,n=12){
+  const pts=[],edges=[[[0,0],[1,0]],[[1,0],[1,1]],[[1,1],[0,1]],[[0,1],[0,0]]];
+  for(const[a,b]of edges){const m=hasGrid(L)?n:1;for(let i=0;i<m;i++){const t=i/m,p=layerPoint(L,a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t);pts.push([p[0],p[1]])}}
+  return pts;
+}
+let coverSig='',coverVal=0;
+function coveragePct(){
+  const vl=S.layers.filter(vis),sig=vl.map(L=>L.corners.join()+(L.grid?L.grid.join():'')).join('|')+'|'+S.base.w+'x'+S.base.h;
+  if(sig===coverSig)return coverVal;coverSig=sig;
+  const k=Math.min(1,600/Math.max(S.base.w,S.base.h)),w=Math.max(1,Math.round(S.base.w*k)),h=Math.max(1,Math.round(S.base.h*k));
+  const c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d',{willReadFrequently:true});x.fillStyle='#fff';
+  for(const L of vl){const p=polyOv(L);x.beginPath();p.forEach((q,i)=>i?x.lineTo(q[0]*k,q[1]*k):x.moveTo(q[0]*k,q[1]*k));x.closePath();x.fill()}
+  const d=x.getImageData(0,0,w,h).data;let n=0;for(let i=3;i<d.length;i+=4)if(d[i]>127)n++;
+  return coverVal=100*n/(w*h);
+}
+function updCoverBtn(){const b=$('#bCover'),t=S.showCover?`Zone couverte : ${Math.round(coveragePct())} %`:'Zone couverte';if(b.textContent!==t)b.textContent=t;b.classList.toggle('on',S.showCover)}
+function toggleCover(){S.showCover=!S.showCover;updCoverBtn();S.dirty=true}
+$('#bCover').onclick=toggleCover;
+window.addEventListener('keydown',e=>{if((e.key==='z'||e.key==='Z')&&!e.ctrlKey&&!e.metaKey&&!/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)&&S.base)toggleCover()});
+function drawOverlay(){
+  const d=dpr();octx.setTransform(d,0,0,d,0,0);octx.clearRect(0,0,ovc.width,ovc.height);
+  if(!S.base)return;
+  if(S.showCover){
+    octx.fillStyle='rgba(76,201,140,.26)';
+    for(const L of S.layers){if(!vis(L))continue;const poly=polyScreen(L);octx.beginPath();poly.forEach((p,i)=>i?octx.lineTo(p[0],p[1]):octx.moveTo(p[0],p[1]));octx.closePath();octx.fill()}
+    updCoverBtn();
+  }
+  const sl=selLayer();
+  for(const L of S.layers){
+    if(!vis(L))continue;const poly=polyScreen(L);
+    octx.beginPath();poly.forEach((p,i)=>i?octx.lineTo(p[0],p[1]):octx.moveTo(p[0],p[1]));octx.closePath();
+    const isSel=L===sl;
+    octx.lineWidth=isSel?2:1;octx.strokeStyle=isSel?'#f0c36a':(L.located?'rgba(255,255,255,.35)':'rgba(224,122,63,.8)');
+    if(!L.noBorder){octx.setLineDash(L.located?[]:[6,4]);octx.stroke();octx.setLineDash([])}
+  }
+  if(sl&&vis(sl)&&S.tool!=='view'){
+    for(const h of handles(sl)){
+      octx.beginPath();if(h.kind==='c')octx.rect(h.p[0]-7,h.p[1]-7,14,14);else octx.arc(h.p[0],h.p[1],7,0,6.2832);
+      octx.fillStyle=h.kind==='c'?'rgba(240,195,106,.9)':'rgba(111,191,115,.9)';octx.fill();octx.lineWidth=1.5;octx.strokeStyle='#111';octx.stroke();
+    }
+  }
+  if(drag&&drag.type==='erase'){
+    const pts=S.eShape==='lasso'?drag.pts:[drag.p0,[drag.cur[0],drag.p0[1]],drag.cur,[drag.p0[0],drag.cur[1]]];
+    octx.beginPath();pts.forEach((q,i)=>i?octx.lineTo(q[0],q[1]):octx.moveTo(q[0],q[1]));octx.closePath();
+    octx.fillStyle=S.eAct==='restore'?'rgba(76,201,140,.28)':'rgba(255,80,80,.30)';octx.fill();octx.setLineDash([6,4]);octx.strokeStyle='#fff';octx.lineWidth=1.5;octx.stroke();octx.setLineDash([]);
+  }
+  if(S.mode==='curtain'&&sl){const x=S.split*$('#stage').clientWidth;octx.beginPath();octx.moveTo(x,0);octx.lineTo(x,ovc.height/d);octx.strokeStyle='rgba(255,255,255,.8)';octx.lineWidth=1.5;octx.stroke()}
+  drawScales();
+}
+(function loop(){if(S.dirty)render();requestAnimationFrame(loop)})();
+window.addEventListener('resize',()=>{resize();});
+
+/* ---------- interactions ---------- */
+const ptrs=new Map();let drag=null,pinch=null;
+function evPos(e){const r=ovc.getBoundingClientRect();return[e.clientX-r.left,e.clientY-r.top]}
+function layerAt(px,py){for(let i=S.layers.length-1;i>=0;i--){const L=S.layers[i];if(!vis(L))continue;if(inPoly([px,py],polyScreen(L)))return L}return null}
+ovc.addEventListener('pointerdown',e=>{
+  ovc.setPointerCapture(e.pointerId);const p=evPos(e);ptrs.set(e.pointerId,p);
+  if(ptrs.size===2){drag=null;const a=[...ptrs.values()];pinch={d:Math.hypot(a[0][0]-a[1][0],a[0][1]-a[1][1]),c:[(a[0][0]+a[1][0])/2,(a[0][1]+a[1][1])/2]};return}
+  const sl=selLayer();let hit=null;
+  if(S.tool==='erase'&&!S.calib.active&&sl&&vis(sl)){drag={type:'erase',p0:p,pts:[p],cur:p};S.dirty=true;return}
+  if(S.calib.active){const rad=e.pointerType==='touch'?24:13;S.calib.pts.forEach((q,i)=>{const sp=o2s(q[0],q[1]);if(Math.hypot(sp[0]-p[0],sp[1]-p[1])<rad)hit={kind:'k',idx:i}})}
+  else if(sl&&vis(sl)&&S.tool!=='view'){const rad=e.pointerType==='touch'?24:13;let best=1e9;for(const h of handles(sl)){const dd=Math.hypot(h.p[0]-p[0],h.p[1]-p[1]);if(dd<rad&&dd<best){best=dd;hit=h}}}
+  if(hit){drag={type:hit.kind,h:hit,sl}}
+  else if(!S.calib.active&&sl&&!sl.locked&&vis(sl)&&S.tool==='corners'&&inPoly(p,polyScreen(sl))){drag={type:'move',sl,start:s2o(p[0],p[1]),c0:sl.corners.map(c=>c.slice())}}
+  else{drag={type:'pan',x0:S.view.x0,y0:S.view.y0,p,moved:false}}
+  ovc.classList.toggle('grabbing',drag.type==='pan');
+});
+ovc.addEventListener('pointermove',e=>{
+  if(!ptrs.has(e.pointerId))return;const p=evPos(e);ptrs.set(e.pointerId,p);
+  if(pinch&&ptrs.size===2){const a=[...ptrs.values()];const d=Math.hypot(a[0][0]-a[1][0],a[0][1]-a[1][1]),c=[(a[0][0]+a[1][0])/2,(a[0][1]+a[1][1])/2];
+    if(pinch.d>0)zoomAt(c[0],c[1],d/pinch.d);S.view.x0-=(c[0]-pinch.c[0])/S.view.z;S.view.y0-=(c[1]-pinch.c[1])/S.view.z;pinch={d,c};S.dirty=true;return}
+  if(!drag)return;
+  const o=s2o(p[0],p[1]);
+  if(drag.type==='erase'){drag.cur=p;if(S.eShape==='lasso'){const l=drag.pts[drag.pts.length-1];if(Math.hypot(p[0]-l[0],p[1]-l[1])>3)drag.pts.push(p)}S.dirty=true}
+  else if(drag.type==='pan'){const dx=p[0]-drag.p[0],dy=p[1]-drag.p[1];if(Math.hypot(dx,dy)>4)drag.moved=true;S.view.x0=drag.x0-dx/S.view.z;S.view.y0=drag.y0-dy/S.view.z;S.dirty=true}
+  else if(drag.type==='c'){const L=drag.sl,old=L.corners[drag.h.idx].slice();const prevOff=null;L.corners[drag.h.idx]=[o[0],o[1]];if(!convexQuad(L.corners)){L.corners[drag.h.idx]=old}else{L.located=true;updateLayer(L);refreshList()}}
+  else if(drag.type==='k'){S.calib.pts[drag.h.idx]=[o[0],o[1]];syncCalib();S.dirty=true}
+  else if(drag.type==='g'){const L=drag.sl;if(!L.grid)L.grid=Array.from({length:9},()=>[0,0]);const base=applyH(L.H,drag.h.u,drag.h.v);L.grid[drag.h.idx]=[o[0]-base[0],o[1]-base[1]];updateLayer(L)}
+  else if(drag.type==='move'){const L=drag.sl,dx=o[0]-drag.start[0],dy=o[1]-drag.start[1];L.corners=drag.c0.map(c=>[c[0]+dx,c[1]+dy]);updateLayer(L)}
+});
+function endPtr(e){
+  const p=ptrs.get(e.pointerId);ptrs.delete(e.pointerId);if(ptrs.size<2)pinch=null;
+  if(drag&&drag.type==='erase'&&p){
+    const d=drag;drag=null;S.dirty=true;
+    let poly;if(S.eShape==='lasso')poly=d.pts.length>2?d.pts:null;else{const a=d.p0,b=p;poly=Math.abs(a[0]-b[0])>5&&Math.abs(a[1]-b[1])>5?[[a[0],a[1]],[b[0],a[1]],[b[0],b[1]],[a[0],b[1]]]:null}
+    const L=selLayer();
+    if(poly&&L){setStatus('Gomme…',false,.5);requestAnimationFrame(()=>{applyErase(L,poly,S.eAct==='restore');syncErase();setStatus(S.eAct==='restore'?'Zone restaurée.':'Zone effacée (↶ Annuler pour revenir en arrière).')})}
+    else if(!poly){const hl=layerAt(p[0],p[1]);if(hl&&hl!==L)select(hl.id)}
+  }
+  if(drag&&drag.type==='pan'&&!drag.moved&&p){if(S.calib.active&&S.calib.pts.length<2){const o=s2o(p[0],p[1]);S.calib.pts.push([o[0],o[1]]);syncCalib();S.dirty=true}else{const L=layerAt(p[0],p[1]);if(L)select(L.id)}}
+  if(ptrs.size===0){drag=null;ovc.classList.remove('grabbing')}
+}
+ovc.addEventListener('pointerup',endPtr);ovc.addEventListener('pointercancel',endPtr);
+ovc.addEventListener('wheel',e=>{e.preventDefault();const p=evPos(e);zoomAt(p[0],p[1],Math.exp(-e.deltaY*(e.ctrlKey?0.01:0.0016)))},{passive:false});
+window.addEventListener('keydown',e=>{
+  const L=selLayer();if(!L||L.locked||S.tool==='view'||S.tool==='erase'||/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)&&document.activeElement.type!=='range')return;
+  const k={ArrowLeft:[-1,0],ArrowRight:[1,0],ArrowUp:[0,-1],ArrowDown:[0,1]}[e.key];if(!k)return;e.preventDefault();
+  const st=(e.shiftKey?10:1)/S.view.z*0.5;L.corners=L.corners.map(c=>[c[0]+k[0]*st,c[1]+k[1]*st]);updateLayer(L);
+});
+
+/* ---------- état / interface ---------- */
+function setStatus(t,err=false,prog=null){
+  const el=$('#status');el.textContent=t;el.className=err?'err':'';const b=$('#bar');
+  if(prog==null){b.style.display='none'}else{b.style.display='block';b.firstElementChild.style.width=Math.round(prog*100)+'%'}
+}
+function hint(){
+  const h=$('#hint');if(!S.base){h.hidden=true;return}h.hidden=false;
+  h.textContent={erase:'Gomme : tracez un rectangle sur le détail sélectionné pour en effacer cette partie.',view:'Vue : glisser pour déplacer, molette / pincement pour zoomer, toucher un détail pour le sélectionner.',corners:'Coins : tirez les 4 poignées (perspective). Glisser dans le détail le déplace ; flèches du clavier = ajustement fin.',grid:'Grille : les 4 coins + 5 points verts pour corriger les déformations locales.'}[S.tool];
+}
+function select(id){S.sel=id;refreshList();syncControls();syncErase&&syncErase()}
+const TRASH='<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg>';
+function trashBtn(fn,title,locked,lockMsg){
+  const b=document.createElement('button');b.className='ib'+(locked?' off':'');b.style.padding='6px';b.title=title;b.innerHTML=TRASH;
+  b.onclick=ev=>{ev.stopPropagation();
+    if(locked){setStatus(lockMsg,true);return}
+    if(b.dataset.armed){fn();return}
+    b.dataset.armed='1';b.textContent='Supprimer ?';b.style.color='#ff8a7a';b.style.whiteSpace='nowrap';b.style.fontSize='12px';
+    setTimeout(()=>{if(b.isConnected){b.dataset.armed='';b.innerHTML=TRASH;b.style.color='';b.style.fontSize=''}},3500)};
+  return b;
+}
+function refreshList(){
+  const list=$('#list');list.innerHTML='';
+  $('#listEmpty').hidden=S.layers.length>0;
+  S.layers.slice().reverse().forEach(L=>{
+    const li=document.createElement('div');li.className='li'+(L.id===S.sel?' sel':'');
+    li.appendChild(L.thumb);
+    const nm=document.createElement('div');nm.className='nm';nm.textContent=L.name;li.appendChild(nm);
+    const dot=document.createElement('span');dot.className='dot'+(L.located?' ok':'');dot.title=L.located?'Localisé':'À localiser / à placer';li.appendChild(dot);
+    const mk=(txt,fn,title)=>{const b=document.createElement('button');b.className='ib';b.textContent=txt;b.title=title;b.onclick=ev=>{ev.stopPropagation();fn()};return b};
+    const eye=mk('',()=>{if(!S.showAll){S.showAll=true;L.visible=true;syncShow()}else L.visible=!L.visible;S.dirty=true;refreshList()},L.visible?'Masquer ce détail':'Afficher ce détail');
+    eye.innerHTML=L.visible&&S.showAll?EYE_ON:EYE_OFF;if(!(L.visible&&S.showAll))eye.classList.add('off');eye.style.padding='6px';li.appendChild(eye);
+    const bd=mk('',()=>{L.noBorder=!L.noBorder;S.dirty=true;refreshList()},L.noBorder?'Afficher la bordure de ce détail':'Masquer la bordure de ce détail');bd.innerHTML=BORDER_ICON;bd.style.padding='6px';if(L.noBorder)bd.classList.add('off');li.appendChild(bd);
+    const lk=mk('',()=>toggleLock(L),L.locked?'Déverrouiller ce détail':'Verrouiller ce détail (empêche tout déplacement)');lk.innerHTML=L.locked?LOCK_ON:LOCK_OFF;lk.style.padding='6px';if(L.locked)lk.style.color='var(--acc)';else lk.classList.add('off');li.appendChild(lk);
+    li.appendChild(mk('▲',()=>moveLayer(L,1),'Passer au-dessus'));li.appendChild(mk('▼',()=>moveLayer(L,-1),'Passer au-dessous'));
+    li.appendChild(trashBtn(()=>deleteLayer(L),'Supprimer ce détail',L.locked,'Déverrouillez ce détail pour le supprimer.'));
+    li.onclick=()=>select(L.id);list.appendChild(li);
+  });
+  if(S.base){ // calque de fond : l’image d’ensemble
+    const li=document.createElement('div');li.className='li base';
+    li.appendChild(S.base.thumb);
+    const nm=document.createElement('div');nm.className='nm';nm.textContent='Image d’ensemble';nm.title=S.base.name;li.appendChild(nm);
+    const sp=document.createElement('span');sp.style.flex='0 0 8px';li.appendChild(sp);
+    const eye=document.createElement('button');eye.className='ib'+(S.baseHidden?' off':'');eye.style.padding='6px';eye.title=S.baseHidden?'Afficher l’image d’ensemble':'Masquer l’image d’ensemble';eye.innerHTML=S.baseHidden?EYE_OFF:EYE_ON;
+    eye.onclick=ev=>{ev.stopPropagation();S.baseHidden=!S.baseHidden;S.dirty=true;refreshList()};li.appendChild(eye);
+    li.appendChild(trashBtn(()=>clearBase(),'Supprimer l’image d’ensemble (retire aussi tous les détails)',false));
+    list.appendChild(li);
+  }
+}
+const EYE_ON='<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>';
+const EYE_OFF='<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.9 17.9A10.9 10.9 0 0 1 12 19C5 19 1 12 1 12a18.5 18.5 0 0 1 5.1-5.9M9.9 5.1A9.7 9.7 0 0 1 12 5c7 0 11 7 11 7a18.6 18.6 0 0 1-2.2 3.2M1 1l22 22"/></svg>';
+function syncShow(){const b=$('#bShow');b.classList.toggle('on',S.showAll);b.textContent=S.showAll?'Détails : visibles':'Détails : masqués'}
+function toggleAll(){S.showAll=!S.showAll;syncShow();S.dirty=true;refreshList()}
+$('#bShow').onclick=toggleAll;
+window.addEventListener('keydown',e=>{if((e.key==='h'||e.key==='H')&&!e.ctrlKey&&!e.metaKey&&!/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)&&S.base)toggleAll()});
+function moveLayer(L,d){const i=S.layers.indexOf(L),j=i+d;if(j<0||j>=S.layers.length)return;S.layers.splice(i,1);S.layers.splice(j,0,L);S.dirty=true;refreshList()}
+const SL=[['rOp','oOp','opacity',v=>Math.round(v*100)+'%'],['rFe','oFe','feather',v=>Math.round(v*100)+'%'],
+  ['rEv','oEv','color.ev',v=>(v>=0?'+':'')+v.toFixed(2)],['rCo','oCo','color.contrast',v=>v.toFixed(2)],['rSa','oSa','color.sat',v=>v.toFixed(2)],
+  ['rWa','oWa','color.warm',v=>v.toFixed(2)],['rTi','oTi','color.tint',v=>v.toFixed(2)]];
+function getp(L,p){return p.split('.').reduce((o,k)=>o[k],L)}
+function setp(L,p,v){const a=p.split('.');const k=a.pop();a.reduce((o,k)=>o[k],L)[k]=v}
+const BORDER_ICON='<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="1.5" stroke-dasharray="3 2.6"/></svg>';
+const LOCK_ON='<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2" fill="currentColor" fill-opacity=".25"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>';
+const LOCK_OFF='<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 7.5-2"/></svg>';
+function syncLock(L){
+  const b=$('#bLock');b.textContent=L.locked?'Déverrouiller':'Verrouiller';b.classList.toggle('on',!!L.locked);
+  for(const id of['bLocate','bRefine','bRotL','bRotR','bDel','bGridReset'])$('#'+id).classList.toggle('dis',!!L.locked);
+}
+function toggleLock(L){L.locked=!L.locked;S.dirty=true;refreshList();if(L.id===S.sel)syncLock(L)}
+$('#bLock').onclick=()=>{const L=selLayer();if(L)toggleLock(L)};
+function syncControls(){
+  const L=selLayer();$('#ctl').hidden=!L;if(!L)return;
+  $('#tName').value=L.name;updResInfo(L);syncLock(L);
+  for(const[r,o,p,f]of SL){const v=getp(L,p);$('#'+r).value=v;$('#'+o).textContent=f(+v)}
+}
+for(const[r,o,p,f]of SL)$('#'+r).addEventListener('input',e=>{const L=selLayer();if(!L)return;const v=parseFloat(e.target.value);setp(L,p,v);$('#'+o).textContent=f(v);S.dirty=true});
+$('#tName').addEventListener('input',e=>{const L=selLayer();if(L){L.name=e.target.value;refreshList()}});
+$('#bColorReset').onclick=()=>{const L=selLayer();if(!L)return;L.color={fit:null,ev:0,contrast:1,sat:1,warm:0,tint:0};syncControls();S.dirty=true};
+$('#bGridReset').onclick=()=>{const L=selLayer();if(!L||L.locked)return;L.grid=null;updateLayer(L)};
+function deleteLayer(L){if(!L||L.locked)return;gl.deleteTexture(L.tex);if(L.maskTex)gl.deleteTexture(L.maskTex);L.work=null;S.layers=S.layers.filter(x=>x!==L);if(S.sel===L.id)S.sel=S.layers.length?S.layers[S.layers.length-1].id:null;S.dirty=true;refreshList();syncControls();updateButtons()}
+function clearBase(){
+  for(const L of S.layers){gl.deleteTexture(L.tex);if(L.maskTex)gl.deleteTexture(L.maskTex);L.work=null}
+  if(S.base){gl.deleteTexture(S.base.tex);S.base.work=null}
+  S.base=null;S.layers=[];S.sel=null;S.baseFeat=null;S.pxPerMm=null;S.baseHidden=false;S.calib={active:false,pts:[],ref:null};
+  syncCalib();updScaleInfo();hint();updateButtons();refreshList();syncControls();S.dirty=true;
+  setStatus('Image d’ensemble supprimée. Chargez-en une nouvelle pour recommencer.');
+}
+$('#bDel').onclick=()=>deleteLayer(selLayer());
+$('#bZoom').onclick=()=>{const L=selLayer();if(!L)return;zoomToLayer(L)};
+function zoomToLayer(L){const xs=L.corners.map(c=>c[0]),ys=L.corners.map(c=>c[1]);const x0=Math.min(...xs),x1=Math.max(...xs),y0=Math.min(...ys),y1=Math.max(...ys);
+  const w=$('#stage').clientWidth,h=$('#stage').clientHeight;const z=Math.min(w/(x1-x0),h/(y1-y0))*0.8;S.view.z=clamp(z,.02,60);S.view.x0=(x0+x1)/2-w/2/S.view.z;S.view.y0=(y0+y1)/2-h/2/S.view.z;S.dirty=true}
+function rotateLayer(L,dir){
+  if(L.locked)return;
+  const o=L.corners,cyc=dir>0?[o[1],o[2],o[3],o[0]]:[o[3],o[0],o[1],o[2]];
+  const ctr=[0,1].map(k=>cyc.reduce((a,c)=>a+c[k],0)/4);
+  const U=[0,1].map(k=>(cyc[1][k]-cyc[0][k]+cyc[2][k]-cyc[3][k])/2),V=[0,1].map(k=>(cyc[3][k]-cyc[0][k]+cyc[2][k]-cyc[1][k])/2);
+  const lu=Math.hypot(...U),lv=Math.hypot(...V),f=Math.sqrt((L.w/L.h)*lv/lu);
+  const Us=U.map(v=>v*f),Vs=V.map(v=>v/f);
+  L.corners=[[-1,-1],[1,-1],[1,1],[-1,1]].map(([a,b])=>[ctr[0]+a*Us[0]/2+b*Vs[0]/2,ctr[1]+a*Us[1]/2+b*Vs[1]/2]);
+  L.located=false;updateLayer(L);refreshList();setStatus('Détail pivoté. Ajustez les coins puis « Affiner », ou relancez « Localiser ».');
+}
+$('#bRotL').onclick=()=>{const L=selLayer();if(L)rotateLayer(L,-1)};
+$('#bRotR').onclick=()=>{const L=selLayer();if(L)rotateLayer(L,1)};
+function setSeg(id,key,cb){$(id).addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;S[key]=b.dataset.v;[...$(id).children].forEach(x=>x.classList.toggle('on',x===b));cb&&cb();hint();S.dirty=true})}
+S.eShape='rect';S.eAct='erase';
+function syncErase(){const on=S.tool==='erase',L=selLayer();$('#bEUndo').hidden=!on;$('#bEUndo').disabled=!(L&&L.maskUndo&&L.maskUndo.length)}
+setSeg('#segTool','tool',syncErase);
+$('#bEUndo').onclick=()=>{undoErase(selLayer());syncErase()};
+setSeg('#segMode','mode',()=>{$('#miniDiff').hidden=S.mode!=='diff';$('#miniCurt').hidden=S.mode!=='curtain'});
+$('#rGain').oninput=e=>{S.gain=+e.target.value;S.dirty=true};$('#rSplit').oninput=e=>{S.split=+e.target.value;S.dirty=true};
+$('#bFit').onclick=fitView;
+function updateButtons(){const has=!!S.base;$('#lblDet').classList.toggle('dis',!has||S.busy);$('#bExport').classList.toggle('dis',!has||S.busy);$('#empty').hidden=has;$('#tools').hidden=!has;$('#modes').hidden=!has;
+  for(const id of['bLocate','bRefine','bColor','bLC','bDel'])$('#'+id).disabled=S.busy&&id!=='bDel'}
+
+/* ---------- chargement des images ---------- */
+async function loadBitmap(file){return await createImageBitmap(file)}
+function workCanvas(bmp,maxSide){const k=Math.min(1,maxSide/Math.max(bmp.width,bmp.height));return downscaleCanvas(bmp,Math.max(1,Math.round(bmp.width*k)),Math.max(1,Math.round(bmp.height*k)))}
+function thumbOf(bmp){const c=document.createElement('canvas');c.width=88;c.height=68;const x=c.getContext('2d');x.fillStyle='#000';x.fillRect(0,0,88,68);const k=Math.min(88/bmp.width,68/bmp.height);x.imageSmoothingQuality='high';x.drawImage(bmp,(88-bmp.width*k)/2,(68-bmp.height*k)/2,bmp.width*k,bmp.height*k);return c}
+async function setBase(file){
+  setStatus('Chargement de l’image d’ensemble…',false,.1);await tick();
+  try{
+    const bmp=await loadBitmap(file),r=await cropDialog(bmp);
+    if(!r){bmp.close&&bmp.close();hint();setStatus(S.base?'Chargement annulé.':'Chargez la photo d’ensemble.');return}
+    await setBaseSource(r,file.name);bmp.close&&bmp.close();
+  }catch(err){setStatus('Impossible de lire cette image : '+err.message,true)}
+}
+async function setBaseSource(bmp,name){
+  setStatus('Préparation de l’image d’ensemble…',false,.1);await tick();
+  try{
+    const t=makeTexture(bmp,true),work=workCanvas(bmp,2400);
+    for(const L of S.layers){gl.deleteTexture(L.tex);L.work=null}S.layers=[];S.sel=null;S.baseFeat=null;S.pxPerMm=null;S.calib={active:false,pts:[],ref:null};syncCalib();updScaleInfo();
+    if(S.base)gl.deleteTexture(S.base.tex);
+    const B={isBase:true,name,work,thumb:thumbOf(bmp),w:bmp.width,h:bmp.height,tex:t.tex,corners:[[0,0],[bmp.width,0],[bmp.width,bmp.height],[0,bmp.height]],grid:null};
+    B.H=hFromQuad(B.corners);buildMesh(B);S.base=B;
+    if(bmp.__pxPerMm){S.pxPerMm=bmp.__pxPerMm;updScaleInfo();S.showScale=true;syncCalib();}
+    resize();fitView();hint();updateButtons();refreshList();syncControls();
+    setStatus(`Image d’ensemble : ${bmp.width}×${bmp.height} px.${t.note?' ('+t.note+')':''} Ajoutez maintenant des détails.`);
+  }catch(err){setStatus('Impossible de lire cette image : '+err.message,true)}
+}
+// ---- recadrage / redressement de l’image d’ensemble (4 poignées indépendantes) ----
+function homUnitToQuad(q){ // (0,0)(1,0)(1,1)(0,1) -> q0..q3
+  const[x0,y0]=q[0],[x1,y1]=q[1],[x2,y2]=q[2],[x3,y3]=q[3];
+  const dx1=x1-x2,dx2=x3-x2,dx3=x0-x1+x2-x3,dy1=y1-y2,dy2=y3-y2,dy3=y0-y1+y2-y3;
+  const den=dx1*dy2-dy1*dx2;let g=0,h=0;
+  if(Math.abs(dx3)>1e-9||Math.abs(dy3)>1e-9){g=(dx3*dy2-dy3*dx2)/den;h=(dx1*dy3-dy1*dx3)/den}
+  return{a:x1-x0+g*x1,b:x3-x0+h*x3,c:x0,d:y1-y0+g*y1,e:y3-y0+h*y3,f:y0,g,h};
+}
+function warpQuad(bmp,q,ow,oh){ // redressement perspective par WebGL2 (échantillonnage mipmap) -> canvas ow×oh
+  const gc=document.createElement('canvas');gc.width=ow;gc.height=oh;
+  const g=gc.getContext('webgl2',{preserveDrawingBuffer:true,antialias:false,premultipliedAlpha:false});
+  if(!g)throw new Error('WebGL indisponible');
+  const mt=g.getParameter(g.MAX_TEXTURE_SIZE);let src=bmp,sx=1,sy=1;
+  if(Math.max(bmp.width,bmp.height)>mt){const k=mt/Math.max(bmp.width,bmp.height);src=downscaleCanvas(bmp,Math.max(1,Math.floor(bmp.width*k)),Math.max(1,Math.floor(bmp.height*k)))}
+  const nq=q.map(([x,y])=>[x/bmp.width,y/bmp.height]),m=homUnitToQuad(nq);
+  const sh=(t,c)=>{const o=g.createShader(t);g.shaderSource(o,c);g.compileShader(o);if(!g.getShaderParameter(o,g.COMPILE_STATUS))throw new Error(g.getShaderInfoLog(o));return o};
+  const pr=g.createProgram();
+  g.attachShader(pr,sh(g.VERTEX_SHADER,`#version 300 es
+in vec2 p;out vec2 uv;void main(){uv=vec2(p.x*.5+.5,.5-p.y*.5);gl_Position=vec4(p,0.,1.);}`));
+  g.attachShader(pr,sh(g.FRAGMENT_SHADER,`#version 300 es
+precision highp float;in vec2 uv;out vec4 o;uniform sampler2D T;uniform vec3 r0,r1,r2;
+void main(){float w=r2.x*uv.x+r2.y*uv.y+1.;vec2 s=vec2(r0.x*uv.x+r0.y*uv.y+r0.z,r1.x*uv.x+r1.y*uv.y+r1.z)/w;o=vec4(texture(T,s).rgb,1.);}`));
+  g.linkProgram(pr);if(!g.getProgramParameter(pr,g.LINK_STATUS))throw new Error('shader');
+  g.useProgram(pr);
+  const buf=g.createBuffer();g.bindBuffer(g.ARRAY_BUFFER,buf);g.bufferData(g.ARRAY_BUFFER,new Float32Array([-1,-1,3,-1,-1,3]),g.STATIC_DRAW);
+  const loc=g.getAttribLocation(pr,'p');g.enableVertexAttribArray(loc);g.vertexAttribPointer(loc,2,g.FLOAT,false,0,0);
+  const tex=g.createTexture();g.bindTexture(g.TEXTURE_2D,tex);g.pixelStorei(g.UNPACK_COLORSPACE_CONVERSION_WEBGL,g.NONE);
+  g.texImage2D(g.TEXTURE_2D,0,g.RGBA,g.RGBA,g.UNSIGNED_BYTE,src);g.generateMipmap(g.TEXTURE_2D);
+  g.texParameteri(g.TEXTURE_2D,g.TEXTURE_MIN_FILTER,g.LINEAR_MIPMAP_LINEAR);g.texParameteri(g.TEXTURE_2D,g.TEXTURE_MAG_FILTER,g.LINEAR);
+  g.texParameteri(g.TEXTURE_2D,g.TEXTURE_WRAP_S,g.CLAMP_TO_EDGE);g.texParameteri(g.TEXTURE_2D,g.TEXTURE_WRAP_T,g.CLAMP_TO_EDGE);
+  g.uniform1i(g.getUniformLocation(pr,'T'),0);
+  g.uniform3f(g.getUniformLocation(pr,'r0'),m.a,m.b,m.c);g.uniform3f(g.getUniformLocation(pr,'r1'),m.d,m.e,m.f);g.uniform3f(g.getUniformLocation(pr,'r2'),m.g,m.h,0);
+  g.viewport(0,0,ow,oh);g.drawArrays(g.TRIANGLES,0,3);
+  const out=document.createElement('canvas');out.width=ow;out.height=oh;out.getContext('2d').drawImage(gc,0,0);
+  const ext=g.getExtension('WEBGL_lose_context');ext&&ext.loseContext();
+  return out;
+}
+function cropDialog(bmp){return new Promise(resolve=>{
+  const M=$('#cropM'),cv=$('#cropC'),wrap=$('#cropWrap'),ctx=cv.getContext('2d'),W=bmp.width,H=bmp.height;
+  const fullQ=()=>[[0,0],[W,0],[W,H],[0,H]];let Q=fullQ(),k=1,drag=null,maxSide=Math.max(W,H);
+  const lim=MOBILE?4096:8192;
+  M.hidden=false;
+  const cross=(o,a,b)=>(a[0]-o[0])*(b[1]-o[1])-(a[1]-o[1])*(b[0]-o[0]);
+  const convex=q=>{const s=[0,1,2,3].map(i=>cross(q[i],q[(i+1)%4],q[(i+2)%4]));return s.every(v=>v>1)||s.every(v=>v<-1)};
+  const inQ=(q,p)=>{const s=[0,1,2,3].map(i=>cross(q[i],q[(i+1)%4],p));return s.every(v=>v>=0)||s.every(v=>v<=0)};
+  const dist=(a,b)=>Math.hypot(a[0]-b[0],a[1]-b[1]);
+  const isRect=()=>Math.abs(Q[0][0]-Q[3][0])<.5&&Math.abs(Q[1][0]-Q[2][0])<.5&&Math.abs(Q[0][1]-Q[1][1])<.5&&Math.abs(Q[3][1]-Q[2][1])<.5;
+  function aspect(){const w=+$('#cropRW').value,h=+$('#cropRH').value;return w>0&&h>0?w/h:null}
+  function natural(){let w=(dist(Q[0],Q[1])+dist(Q[3],Q[2]))/2,h=(dist(Q[0],Q[3])+dist(Q[1],Q[2]))/2;const ar=aspect();if(ar){const m=Math.max(w,h);if(ar>=1){w=m;h=m/ar}else{h=m;w=m*ar}if(w>(dist(Q[0],Q[1])+dist(Q[3],Q[2]))/2*1.0001&&h>(dist(Q[0],Q[3])+dist(Q[1],Q[2]))/2*1.0001){/*pas d’agrandissement inutile*/}}return[w,h]}
+  function outSize(){const[w,h]=natural(),m=Math.max(w,h),f=Math.min(1,maxSide/m,lim/m);return[Math.max(1,Math.round(w*f)),Math.max(1,Math.round(h*f))]}
+  function layout(){
+    const mw=Math.min(M.clientWidth-50,700),mh=Math.max(160,innerHeight*(innerWidth<=820?.45:.55));
+    k=Math.min(mw/W,mh/H);cv.width=Math.round(W*k);cv.height=Math.round(H*k);wrap.style.width=cv.width+'px';draw();
+  }
+  function info(){const[w,h]=outSize();$('#cropInfo').textContent=`Sortie rectifiée : ${w} × ${h} px (${(w*h/1e6).toFixed(1)} Mpx)`+(aspect()?` · proportions ${$('#cropRW').value}:${$('#cropRH').value}`:'')+((+$('#cropRW').value>0||+$('#cropRH').value>0)?' · échelle étalonnée':'');$('#cropMax').value=Math.max(w,h)}
+  function draw(){
+    ctx.clearRect(0,0,cv.width,cv.height);ctx.drawImage(bmp,0,0,cv.width,cv.height);
+    const P=Q.map(([x,y])=>[x*k,y*k]),path=()=>{ctx.beginPath();P.forEach((c,i)=>i?ctx.lineTo(c[0],c[1]):ctx.moveTo(c[0],c[1]));ctx.closePath()};
+    ctx.save();ctx.beginPath();ctx.rect(0,0,cv.width,cv.height);P.forEach((c,i)=>i?ctx.lineTo(c[0],c[1]):ctx.moveTo(c[0],c[1]));ctx.closePath();ctx.fillStyle='rgba(0,0,0,.55)';ctx.fill('evenodd');ctx.restore();
+    ctx.strokeStyle='rgba(255,255,255,.4)';ctx.lineWidth=1;ctx.beginPath();
+    const L=(a,b,t)=>[a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t];
+    for(let i=1;i<3;i++){const t=i/3,a=L(P[0],P[1],t),b=L(P[3],P[2],t),c=L(P[0],P[3],t),d=L(P[1],P[2],t);ctx.moveTo(a[0],a[1]);ctx.lineTo(b[0],b[1]);ctx.moveTo(c[0],c[1]);ctx.lineTo(d[0],d[1])}ctx.stroke();
+    path();ctx.strokeStyle='#e8a93a';ctx.lineWidth=2;ctx.stroke();
+    for(const[cx,cy]of P){ctx.fillStyle='#e8a93a';ctx.fillRect(cx-9,cy-9,18,18);ctx.strokeStyle='#111';ctx.lineWidth=1.5;ctx.strokeRect(cx-9,cy-9,18,18)}
+    info();
+  }
+  const pt=e=>{const r=cv.getBoundingClientRect();return[(e.clientX-r.left)/k,(e.clientY-r.top)/k]};
+  cv.onpointerdown=e=>{
+    const p=pt(e),tol=28/k;let best=-1,bd=tol;
+    Q.forEach((c,i)=>{const d=dist(c,p);if(d<bd){bd=d;best=i}});
+    if(best>=0)drag={m:'c',i:best};
+    else if(inQ(Q,p))drag={m:'m',p0:p,Q0:Q.map(c=>c.slice())};
+    else return;
+    cv.setPointerCapture(e.pointerId);e.preventDefault();
+  };
+  cv.onpointermove=e=>{
+    if(!drag)return;const p=pt(e);
+    if(drag.m==='m'){
+      let dx=p[0]-drag.p0[0],dy=p[1]-drag.p0[1];const xs=drag.Q0.map(c=>c[0]),ys=drag.Q0.map(c=>c[1]);
+      dx=Math.max(-Math.min(...xs),Math.min(W-Math.max(...xs),dx));dy=Math.max(-Math.min(...ys),Math.min(H-Math.max(...ys),dy));
+      Q=drag.Q0.map(c=>[c[0]+dx,c[1]+dy]);
+    }else{
+      const nq=Q.map(c=>c.slice());nq[drag.i]=[Math.min(W,Math.max(0,p[0])),Math.min(H,Math.max(0,p[1]))];
+      if(convex(nq))Q=nq;
+    }
+    draw();e.preventDefault();
+  };
+  cv.onpointerup=cv.onpointercancel=()=>{drag=null};
+  $('#cropMax').onchange=e=>{const v=Math.round(+e.target.value);if(v>=50)maxSide=v;draw()};
+  $('#cropRW').oninput=$('#cropRH').oninput=()=>draw();
+  $('#cropOrig').onclick=()=>{maxSide=1e9;draw()};
+  $('#cropReset').onclick=()=>{Q=fullQ();maxSide=Math.max(W,H);$('#cropRW').value=$('#cropRH').value='';draw()};
+  const onResize=()=>layout();addEventListener('resize',onResize);
+  function close(v){M.hidden=true;removeEventListener('resize',onResize);resolve(v)}
+  $('#cropCancel').onclick=()=>close(null);
+  $('#cropOk').onclick=async()=>{
+    $('#cropOk').disabled=true;await tick();
+    try{
+      const[ow,oh]=outSize(),rect=isRect()&&!aspect(),rw0=+$('#cropRW').value,rh0=+$('#cropRH').value;
+      const cal=o=>{if(rw0>0)o.__pxPerMm=ow/(rw0*10);else if(rh0>0)o.__pxPerMm=oh/(rh0*10);return o};
+      if(rect){
+        const x0=Math.min(Q[0][0],Q[3][0]),y0=Math.min(Q[0][1],Q[1][1]),x1=Math.max(Q[1][0],Q[2][0]),y1=Math.max(Q[3][1],Q[2][1]);
+        if(x0<.5&&y0<.5&&x1>W-1&&y1>H-1&&ow===W&&oh===H&&!(rw0>0||rh0>0))return close(bmp);
+        const rx=Math.round(x0),ry=Math.round(y0),rw=Math.max(1,Math.round(x1-x0)),rh=Math.max(1,Math.round(y1-y0));
+        const c=document.createElement('canvas');c.width=rw;c.height=rh;c.getContext('2d').drawImage(bmp,rx,ry,rw,rh,0,0,rw,rh);
+        close(cal(ow===rw&&oh===rh?c:downscaleCanvas(c,ow,oh)));
+      }else close(cal(warpQuad(bmp,Q,ow,oh)));
+    }catch(err){setStatus('Recadrage impossible : '+err.message,true);close(null)}
+    finally{$('#cropOk').disabled=false}
+  };
+  layout();
+})}
+function newLayer(file,bmp,t){
+  const st=$('#stage'),z=S.view.z;
+  const cx=S.view.x0+st.clientWidth/2/z,cy=S.view.y0+st.clientHeight/2/z;
+  let w=Math.min(st.clientWidth*.35/z,S.base.w*.5),h=w*bmp.height/bmp.width;if(h>S.base.h*.5){h=S.base.h*.5;w=h*bmp.width/bmp.height}
+  const L={id:S.nextId++,name:file.name.replace(/\.[^.]+$/,''),work:workCanvas(bmp,1600),w:bmp.width,h:bmp.height,tex:t.tex,thumb:thumbOf(bmp),
+    corners:[[cx-w/2,cy-h/2],[cx+w/2,cy-h/2],[cx+w/2,cy+h/2],[cx-w/2,cy+h/2]],grid:null,visible:true,located:false,opacity:.7,feather:.02,
+    color:{fit:null,ev:0,contrast:1,sat:1,warm:0,tint:0}};
+  L.H=hFromQuad(L.corners);buildMesh(L);bmp.close&&bmp.close();return L;
+}
+async function addDetails(files){
+  if(!S.base){setStatus('Chargez d’abord la photo d’ensemble.',true);return}
+  const added=[];
+  S.showAll=true;syncShow();
+  for(const f of files){
+    try{setStatus('Chargement de '+f.name+'…',false,.1);await tick();const bmp=await loadBitmap(f),t=makeTexture(bmp);const L=newLayer(f,bmp,t);S.layers.push(L);added.push(L);select(L.id);S.dirty=true;updateButtons();await tick(60)}
+    catch(err){setStatus('Lecture impossible ('+f.name+') : '+err.message,true)}
+  }
+  S.tool='corners';[...$('#segTool').children].forEach(b=>b.classList.toggle('on',b.dataset.v==='corners'));hint();
+  for(const L of added){select(L.id);await locate(L,{auto:true})}
+}
+$('#fBase').onchange=e=>{if(e.target.files[0])setBase(e.target.files[0]);e.target.value=''};
+$('#fBase2').onchange=e=>{if(e.target.files[0])setBase(e.target.files[0]);e.target.value=''};
+$('#fDet').onchange=e=>{const f=[...e.target.files];e.target.value='';if(f.length)addDetails(f)};
+for(const ev of['dragover','drop'])window.addEventListener(ev,e=>{e.preventDefault();if(ev==='drop'){const f=[...e.dataTransfer.files].filter(x=>x.type.startsWith('image/'));if(!f.length)return;if(!S.base)setBase(f[0]).then(()=>f.length>1&&addDetails(f.slice(1)));else addDetails(f)}});
+
+glc.addEventListener('webglcontextlost',e=>{e.preventDefault();setStatus('La mémoire graphique est saturée : retirez des détails ou rechargez la page (les réglages ne sont pas conservés).',true)});
+window.addEventListener('unhandledrejection',e=>{console.error(e.reason);setStatus('Erreur : '+((e.reason&&e.reason.message)||e.reason),true)});
+window.addEventListener('error',e=>{setStatus('Erreur : '+e.message,true)});
+/* ---------- OpenCV ---------- */
+function loadScript(src){return new Promise((res,rej)=>{const s=document.createElement('script');s.src=src;s.onload=res;s.onerror=()=>rej(new Error('chargement impossible : '+src));document.head.appendChild(s)})}
+function resetCV(){ // repart d’un module OpenCV neuf (libère toute la mémoire WebAssembly)
+  S.cv=null;S.cvState='idle';S.baseFeat=null;try{delete window.cv}catch(e){window.cv=undefined}
+  for(const sc of[...document.querySelectorAll('script')])if(/opencv\.js/.test(sc.src))sc.remove();
+}
+const MEMERR=/out of bounds|memory|abort|unreachable|RuntimeError|enlarge/i;
+async function ensureCV(){
+  if(S.cv)return S.cv;if(S.cvState==='failed')throw new Error('OpenCV indisponible');
+  setStatus('Chargement du module de localisation (une seule fois, ~13 Mo)…',false,.15);await tick();
+  try{
+    try{await loadScript('opencv.js')}catch(e){await loadScript('https://cdn.jsdelivr.net/npm/@techstark/opencv-js@5.0.0-release.1/dist/opencv.js')}
+    let c=window.cv;if(c&&typeof c.then==='function')c=await c;
+    if(!c.Mat)await new Promise(r=>{c.onRuntimeInitialized=r});
+    S.cv=c;S.cvState='ok';return c;
+  }catch(e){S.cvState='failed';throw e}
+}
+function grayMat(cv,src,w,h){ // src : ImageBitmap/canvas
+  let cur=src;if(src.width/w>=2||src.height/h>=2)cur=downscaleCanvas(src,w,h);
+  const c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d',{willReadFrequently:true});x.imageSmoothingQuality='high';x.drawImage(cur,0,0,w,h);
+  const d=x.getImageData(0,0,w,h).data,m=new cv.Mat(h,w,cv.CV_8UC1),o=m.data;
+  for(let i=0,j=0;j<o.length;i+=4,j++)o[j]=(d[i]*77+d[i+1]*150+d[i+2]*29)>>8;
+  return m;
+}
+function orbFeatures(cv,gray,nf){
+  const m=new cv.Mat(),msk=new cv.Mat();cv.equalizeHist(gray,m);
+  const orb=new cv.ORB(nf,1.2,12,15,0,2,cv.ORB_HARRIS_SCORE,31,10),kp=new cv.KeyPointVector(),des=new cv.Mat();
+  orb.detectAndCompute(m,msk,kp,des);
+  const pts=[];for(let i=0;i<kp.size();i++){const p=kp.get(i).pt;pts.push([p.x,p.y])}
+  m.delete();msk.delete();orb.delete();kp.delete();return{pts,des};
+}
+function matchH(cv,A,B,ratio=.8){
+  if(A.pts.length<8||B.pts.length<8)return null;
+  const bf=new cv.BFMatcher(cv.NORM_HAMMING,false),mm=new cv.DMatchVectorVector();bf.knnMatch(A.des,B.des,mm,2);
+  const src=[],dst=[];
+  for(let i=0;i<mm.size();i++){const v=mm.get(i);if(v.size()<2){v.delete();continue}const a=v.get(0),b=v.get(1);if(a.distance<ratio*b.distance){src.push(A.pts[a.queryIdx][0],A.pts[a.queryIdx][1]);dst.push(B.pts[a.trainIdx][0],B.pts[a.trainIdx][1])}v.delete()}
+  bf.delete();mm.delete();const n=src.length/2;if(n<8)return{H:null,inl:0,n};
+  const s=cv.matFromArray(n,1,cv.CV_32FC2,src),d=cv.matFromArray(n,1,cv.CV_32FC2,dst),mask=new cv.Mat();let H=null,inl=0;
+  const inPts=[];
+  try{const Hm=cv.findHomography(s,d,cv.RANSAC,3.0,mask);if(Hm&&!Hm.empty()){H=Array.from(Hm.data64F);for(let i=0;i<mask.rows;i++)if(mask.data[i]){inl++;inPts.push([src[2*i],src[2*i+1]])}}Hm&&Hm.delete()}catch(e){}
+  s.delete();d.delete();mask.delete();return{H,inl,n,inPts};
+}
+const normH=H=>H.map(v=>v/H[8]);
+function quadOK(L,q){return convexQuad(q)&&quadArea(q)>25&&quadArea(q)<S.base.w*S.base.h*1.5}
+
+S.rotOrder=[[0,.8],[90,.8],[180,.8],[270,.8]]; // pivots testés si le détail n'est pas retrouvé tel quel
+/* contrôle géométrique : rejette les quadrilatères trop déformés pour être une vraie prise de vue */
+function quadValid(L,q){
+  if(!convexQuad(q))return false;
+  const d=(i,j)=>Math.hypot(q[i][0]-q[j][0],q[i][1]-q[j][1]),e=[d(0,1),d(1,2),d(2,3),d(3,0)];
+  if(Math.min(...e)<10)return false;
+  if(Math.max(e[0]/e[2],e[2]/e[0])>2.5||Math.max(e[1]/e[3],e[3]/e[1])>2.5)return false;
+  for(let i=0;i<4;i++){const a=q[i],b=q[(i+1)%4],c=q[(i+3)%4];const v1=[b[0]-a[0],b[1]-a[1]],v2=[c[0]-a[0],c[1]-a[1]];
+    const ang=Math.acos(clamp((v1[0]*v2[0]+v1[1]*v2[1])/(Math.hypot(...v1)*Math.hypot(...v2)),-1,1))*57.2958;if(ang<35||ang>145)return false}
+  const asp=(e[0]+e[2])/(e[1]+e[3]),da=L.w/L.h;if(asp/da>2.2||da/asp>2.2)return false;
+  const area=quadArea(q);if(area>S.base.w*S.base.h*1.3)return false;
+  const H=hFromQuad(q);if(!H)return false;let inside=0,tot=0;
+  for(let a=0;a<10;a++)for(let b=0;b<10;b++){const p=applyH(H,(a+.5)/10,(b+.5)/10);tot++;if(p[0]>=0&&p[0]<=S.base.w&&p[1]>=0&&p[1]<=S.base.h)inside++}
+  return inside/tot>=.4;
+}
+/* vérification photométrique : corrélation entre le détail posé à cet endroit et l’image d’ensemble */
+function candNCC(L,q){
+  const old=L.corners.map(c=>c.slice()),oldH=L.H;
+  try{
+    L.corners=q;updateLayer(L);
+    const xs=q.map(c=>c[0]),ys=q.map(c=>c[1]);
+    const x0=Math.max(0,Math.floor(Math.min(...xs))),y0=Math.max(0,Math.floor(Math.min(...ys))),x1=Math.min(S.base.w,Math.ceil(Math.max(...xs))),y1=Math.min(S.base.h,Math.ceil(Math.max(...ys)));
+    const rw=x1-x0,rh=y1-y0;if(rw<12||rh<12)return -1;
+    const k=Math.min(1,220/Math.max(rw,rh)),w=Math.max(8,Math.round(rw*k)),h=Math.max(8,Math.round(rh*k));
+    const com={ox:x0,oy:y0,sx:w/rw,sy:h/rh,outW:w,outH:h};
+    const T=renderRegion({...com,list:[{L:S.base}]}),I=renderRegion({...com,list:[{L,raw:true}]});
+    let n=0,sa=0,sb=0,saa=0,sbb=0,sab=0;
+    for(let i=0;i<w*h*4;i+=4){if(I[i+3]<250||T[i+3]<250)continue;const a=T[i]*.299+T[i+1]*.587+T[i+2]*.114,b=I[i]*.299+I[i+1]*.587+I[i+2]*.114;n++;sa+=a;sb+=b;saa+=a*a;sbb+=b*b;sab+=a*b}
+    if(n<(w*h)*.15)return -1;
+    const va=saa/n-(sa/n)**2,vb=sbb/n-(sb/n)**2;if(va<1||vb<1)return -1;
+    return (sab/n-(sa/n)*(sb/n))/Math.sqrt(va*vb);
+  }finally{L.corners=old;L.H=oldH;updateLayer(L)}
+}
+async function orbLocate(L,onP){
+  const cv=S.cv;
+  if(!S.baseFeat){
+    const sb=Math.min(1,(MOBILE?1800:2400)/Math.max(S.base.w,S.base.h)),w=Math.round(S.base.w*sb),h=Math.round(S.base.h*sb);
+    onP('Analyse de l’image d’ensemble…',.25);await tick();
+    const g=grayMat(cv,S.base.work,w,h);S.baseFeat={sb,feat:orbFeatures(cv,g,MOBILE?5000:9000)};g.delete();
+  }
+  const{sb,feat}=S.baseFeat;
+  const widths=[];for(let w=Math.min(L.work.width,MOBILE?1100:1500);w>=110;w=Math.round(w/2))widths.push(w);
+  const pick=(cands,minInl)=>{
+    const ok=cands.filter(c=>c.inl>=minInl).sort((a,b)=>b.inl-a.inl).slice(0,5);let best=null;
+    for(const c of ok){c.ncc=candNCC(L,c.q);if(c.ncc>=.12&&(!best||c.ncc+c.inl*.004>best.ncc+best.inl*.004))best=c}
+    return best;
+  };
+  const all=[];
+  for(const[rot,ratio]of S.rotOrder){
+    const cands=[];
+    for(let i=0;i<widths.length;i++){
+      const w=widths[i],h=Math.round(w*L.h/L.w);
+      onP(`Recherche${rot?` (détail pivoté de ${rot}°)`:''} — échelle ${i+1}/${widths.length}…`,.3+.4*i/widths.length);await tick();
+      const g0=grayMat(cv,L.work,w,h);let g=g0,Mr=[1,0,0,0,1,0,0,0,1];
+      if(rot){g=new cv.Mat();cv.rotate(g0,g,rot===90?cv.ROTATE_90_CLOCKWISE:rot===180?cv.ROTATE_180:cv.ROTATE_90_COUNTERCLOCKWISE);g0.delete();
+        Mr=rot===90?[0,-1,h,1,0,0,0,0,1]:rot===180?[-1,0,w,0,-1,h,0,0,1]:[0,1,0,-1,0,w,0,0,1]}
+      const A=orbFeatures(cv,g,MOBILE?2500:4000);g.delete();
+      const r=matchH(cv,A,feat,ratio);A.des.delete();
+      if(r&&r.H&&r.inl>=(rot?15:10)){
+        // dispersion des points concordants dans le détail (évite un amas local)
+        const px=r.inPts.map(p=>p[0]),py=r.inPts.map(p=>p[1]),sp=((Math.max(...px)-Math.min(...px))*(Math.max(...py)-Math.min(...py)))/(w*h);
+        const kd=w/L.w,H=mul3(mul3(mul3([1/sb,0,0,0,1/sb,0,0,0,1],normH(r.H)),Mr),[kd,0,0,0,kd,0,0,0,1]);
+        const q=[[0,0],[L.w,0],[L.w,L.h],[0,L.h]].map(p=>applyH(H,p[0],p[1]));
+        if(sp>=.06&&quadValid(L,q))cands.push({inl:r.inl,n:r.n,q,rot,sp});
+      }
+    }
+    onP('Vérification des candidats…',.7);await tick();
+    const best=pick(cands,rot?15:10);
+    if(best)return best;
+  }
+  return null;
+}
+function grayF(buf,w,h){const a=new Float32Array(w*h);for(let i=0,j=0;j<a.length;i+=4,j++)a[j]=(buf[i]*.299+buf[i+1]*.587+buf[i+2]*.114);return a}
+/* normalisation locale (soustrait l’éclairage lent, divise par le contraste local) : robuste aux reflets et dégradés de lumière */
+function normLocal(cv,arr,w,h,sigma){
+  const f=cv.matFromArray(h,w,cv.CV_32FC1,arr),mu=new cv.Mat(),d=new cv.Mat(),sq=new cv.Mat(),v=new cv.Mat(),o=new cv.Mat(),eps=new cv.Mat(h,w,cv.CV_32F,new cv.Scalar(4));
+  cv.GaussianBlur(f,mu,new cv.Size(0,0),sigma);cv.subtract(f,mu,d);cv.multiply(d,d,sq);cv.GaussianBlur(sq,v,new cv.Size(0,0),sigma);cv.sqrt(v,v);cv.add(v,eps,v);cv.divide(d,v,o);
+  const out=new cv.Mat();cv.GaussianBlur(o,out,new cv.Size(3,3),0);
+  [f,mu,d,sq,v,o,eps].forEach(m=>m.delete());return out;
+}
+/* recherche grossière (translation + échelle) : élargit la zone de capture quand le placement de départ est approximatif */
+function coarseAlign(L){
+  const cv=S.cv,old=L.corners.map(c=>c.slice());
+  const xs=old.map(c=>c[0]),ys=old.map(c=>c[1]),sw=Math.max(...xs)-Math.min(...xs),sh=Math.max(...ys)-Math.min(...ys);
+  if(sw<20||sh<20)return false;
+  const x0=Math.max(0,Math.floor(Math.min(...xs)-.45*sw)),y0=Math.max(0,Math.floor(Math.min(...ys)-.45*sh)),x1=Math.min(S.base.w,Math.ceil(Math.max(...xs)+.45*sw)),y1=Math.min(S.base.h,Math.ceil(Math.max(...ys)+.45*sh));
+  const rw=x1-x0,rh=y1-y0,k=clamp(130/Math.max(sw,sh),.03,1),w=Math.round(rw*k),h=Math.round(rh*k);
+  if(w<40||h<40)return false;
+  const com={ox:x0,oy:y0,sx:w/rw,sy:h/rh,outW:w,outH:h};
+  const others=[{L:S.base},...S.layers.filter(l=>l!==L&&vis(l)).map(l=>({L:l}))];
+  const Tn=normLocal(cv,grayF(renderRegion({...com,list:others}),w,h),w,h,2.5);
+  const ctr=[xs.reduce((a,b)=>a+b)/4,ys.reduce((a,b)=>a+b)/4];let best=null,ref=null;
+  try{
+    for(const sf of[.9,.95,1,1.05,1.1]){
+      L.corners=old.map(c=>[ctr[0]+(c[0]-ctr[0])*sf,ctr[1]+(c[1]-ctr[1])*sf]);updateLayer(L);
+      const Ib=renderRegion({...com,list:[{L,raw:true}]});
+      let bx0=w,by0=h,bx1=-1,by1=-1;
+      for(let y=0;y<h;y++)for(let x=0;x<w;x++)if(Ib[(y*w+x)*4+3]>=250){if(x<bx0)bx0=x;if(x>bx1)bx1=x;if(y<by0)by0=y;if(y>by1)by1=y}
+      const tw=bx1-bx0+1,th=by1-by0+1;if(tw<12||th<12||tw>=w||th>=h)continue;
+      const In=normLocal(cv,grayF(Ib,w,h),w,h,2.5),tpl=In.roi(new cv.Rect(bx0,by0,tw,th)),res=new cv.Mat();
+      cv.matchTemplate(Tn,tpl,res,cv.TM_CCORR_NORMED);
+      const mm=cv.minMaxLoc(res),r0=res.floatAt(by0,bx0);
+      const cand={sf,score:mm.maxVal,r0,dx:(mm.maxLoc.x-bx0)/com.sx,dy:(mm.maxLoc.y-by0)/com.sy};
+      if(sf===1)ref=cand;if(!best||cand.score>best.score)best=cand;
+      tpl.delete();res.delete();In.delete();
+    }
+  }finally{Tn.delete();L.corners=old;updateLayer(L)}
+  if(!best||!ref)return false;
+  if(best.score>.15&&best.score-ref.r0>.04&&(best.dx||best.dy||best.sf!==1)){
+    L.corners=old.map(c=>[ctr[0]+(c[0]-ctr[0])*best.sf+best.dx,ctr[1]+(c[1]-ctr[1])*best.sf+best.dy]);updateLayer(L);return true;
+  }
+  return false;
+}
+async function eccRefine(L,onP){
+  const cv=S.cv,orig=L.corners.map(c=>c.slice());
+  try{onP('Recherche grossière…',.74);await tick();coarseAlign(L)}catch(e){console.error(e);L.corners=orig;updateLayer(L)}
+  const xs=L.corners.map(c=>c[0]),ys=L.corners.map(c=>c[1]);
+  const mx=Math.max(8,.15*(Math.max(...xs)-Math.min(...xs))),my=Math.max(8,.15*(Math.max(...ys)-Math.min(...ys)));
+  const x0=Math.max(0,Math.floor(Math.min(...xs)-mx)),y0=Math.max(0,Math.floor(Math.min(...ys)-my)),x1=Math.min(S.base.w,Math.ceil(Math.max(...xs)+mx)),y1=Math.min(S.base.h,Math.ceil(Math.max(...ys)+my));
+  const rw=x1-x0,rh=y1-y0;if(rw<16||rh<16)return null;
+  const sc0=Math.min(2,Math.min(MAXRB,1100)/Math.max(rw,rh));let cc=0,ok=false;
+  const others=[{L:S.base},...S.layers.filter(l=>l!==L&&vis(l)).map(l=>({L:l}))];
+  const startCorners=orig,size0=Math.max(...xs)-Math.min(...xs);
+  let nccBefore=-1;try{nccBefore=candNCC(L,orig)}catch(e){}
+  for(const lev of[.125,.25,.5,1]){
+    const sc=sc0*lev,w=Math.round(rw*sc),h=Math.round(rh*sc);if(w<40||h<40)continue;
+    onP(`Affinage ${Math.round(lev*100)} %…`,.75+.2*(lev<.2?0:lev<.4?.33:lev<.8?.66:1));await tick();
+    const com={ox:x0,oy:y0,sx:w/rw,sy:h/rh,outW:w,outH:h};
+    const Tb=renderRegion({...com,list:others}),Ib=renderRegion({...com,list:[{L,raw:true}]});
+    const gT=grayF(Tb,w,h),gI=grayF(Ib,w,h);
+    const mk=new cv.Mat(h,w,cv.CV_8UC1);
+    for(let i=0,j=0;j<w*h;i+=4,j++)mk.data[j]=(Ib[i+3]>=250&&Tb[i+3]>=250&&gI[j]<244&&gT[j]<244)?255:0; // hors zones saturées (reflets)
+    const ker=cv.Mat.ones(5,5,cv.CV_8U);cv.erode(mk,mk,ker);ker.delete();
+    const sg=clamp(.012*Math.max(w,h),2,12),Ts=normLocal(cv,gT,w,h,sg),Is=normLocal(cv,gI,w,h,sg);
+    const W=cv.Mat.eye(3,3,cv.CV_32F),crit=new cv.TermCriteria(cv.TermCriteria_COUNT+cv.TermCriteria_EPS,80,1e-6);
+    try{
+      const c=cv.findTransformECC(Ts,Is,W,cv.MOTION_HOMOGRAPHY,crit,mk,5);
+      const Wl=Array.from(W.data32F),Wi=inv3(Wl);
+      const A=[com.sx,0,-com.sx*x0,0,com.sy,-com.sy*y0,0,0,1],Ai=inv3(A);
+      if(Wi&&Ai){const Hn=mul3(Ai,mul3(Wi,mul3(A,L.H)));
+        const q=[[0,0],[1,0],[1,1],[0,1]].map(p=>applyH(Hn,p[0],p[1]));
+        const move=Math.max(...q.map((p,i)=>Math.hypot(p[0]-L.corners[i][0],p[1]-L.corners[i][1])));
+        if(quadOK(L,q)&&quadValid(L,q)&&c>.08&&move<size0*.35){L.corners=q;updateLayer(L);ok=true;cc=c}
+      }
+    }catch(e){/* non convergé : on garde la position */}
+    [Ts,Is,mk,W].forEach(m=>m.delete());
+  }
+  if(ok){ // le résultat final doit être au moins aussi cohérent avec l’ensemble que le départ
+    let after=-1;try{after=candNCC(L,L.corners.map(c=>c.slice()))}catch(e){}
+    if(nccBefore>-1&&after>-1&&after<nccBefore-.04){L.corners=startCorners;updateLayer(L);return null}
+  }
+  return ok?{cc,moved:startCorners}:null;
+}
+async function locate(L,{auto=false,refineOnly=false,retried=false}={}){
+  if(S.busy)return;S.busy=true;updateButtons();let retrying=false;
+  try{
+    let cv;try{cv=await ensureCV()}catch(e){setStatus('Localisation automatique indisponible ('+e.message+'). Placez les 4 coins à la main (mode Coins), puis utilisez « Différence » pour vérifier.',true);return}
+    const onP=(t,p)=>setStatus(t,false,p);
+    if(!refineOnly){
+      onP('Recherche de l’emplacement…',.2);await tick();
+      const r=await orbLocate(L,onP);
+      if(!r){setStatus(`« ${L.name} » : emplacement non trouvé automatiquement. Placez les coins à la main, puis « Affiner ».`,true);L.opacity=.6;syncControls();return}
+      L.corners=r.q;L.located=true;L.opacity=1;updateLayer(L);zoomToLayer(L);
+      onP(`${r.inl} points concordants${r.rot?' (détail retrouvé pivoté de '+r.rot+'°)':''}. Affinage…`,.72);
+    }
+    const e=await eccRefine(L,onP);
+    L.located=!!e||refineOnly&&L.located;if(L.opacity<1&&!refineOnly&&e)L.opacity=1;refreshList();syncControls();
+    setStatus(e?`« ${L.name} » localisé et affiné (corrélation ${e.cc.toFixed(3)}). Vérifiez avec le mode Différence.`:`« ${L.name} » : position approximative, affinage non concluant. Vérifiez en mode Différence, rapprochez les coins à la main puis relancez « Affiner ».`);
+  }catch(err){
+    console.error(err);const msg=String(err&&err.message||err);
+    if(MEMERR.test(msg)&&!retried){ // mémoire de calcul saturée (iPhone) : nouveau module, puis nouvel essai automatique
+      retrying=true;resetCV();setStatus('Mémoire de calcul saturée : redémarrage du module et nouvel essai…',false,.1);
+      setTimeout(()=>{S.busy=false;locate(L,{auto,refineOnly,retried:true})},50);return;
+    }
+    setStatus('Erreur de localisation : '+msg+(MEMERR.test(msg)?' — rechargez la page puis réessayez avec moins de calques.':''),true)
+  }
+  finally{if(!retrying)S.busy=false;updateButtons();S.dirty=true}
+}
+$('#bLocate').onclick=()=>{const L=selLayer();if(L&&!L.locked)locate(L)};
+$('#bRefine').onclick=()=>{const L=selLayer();if(L&&!L.locked)locate(L,{refineOnly:true})};
+
+/* ---------- colorimétrie ---------- */
+function solve(A,b){const n=b.length;A=A.map((r,i)=>[...r,b[i]]);for(let i=0;i<n;i++){let p=i;for(let r=i+1;r<n;r++)if(Math.abs(A[r][i])>Math.abs(A[p][i]))p=r;[A[i],A[p]]=[A[p],A[i]];if(Math.abs(A[i][i])<1e-12)return null;for(let r=0;r<n;r++){if(r===i)continue;const f=A[r][i]/A[i][i];for(let c=i;c<=n;c++)A[r][c]-=f*A[i][c]}}return A.map((r,i)=>r[n]/r[i])}
+function fitLumContrast(X,Y){ // un seul gain (contraste) + un seul décalage (luminosité) pour les 3 canaux : teintes préservées
+  const n=X.length;let w=new Float32Array(n).fill(1),a=1,b=0;
+  for(let it=0;it<4;it++){
+    let sx=0,sy=0,sxx=0,sxy=0,m=0;
+    for(let i=0;i<n;i++){if(!w[i])continue;for(let c=0;c<3;c++){const x=X[i][c],y=Y[i][c];sx+=x;sy+=y;sxx+=x*x;sxy+=x*y;m++}}
+    const den=m*sxx-sx*sx;if(Math.abs(den)<1e-9)break;
+    a=(m*sxy-sx*sy)/den;b=(sy-a*sx)/m;
+    const res=new Float32Array(n);let ss=0,cnt=0;
+    for(let i=0;i<n;i++){let e=0;for(let c=0;c<3;c++)e+=(a*X[i][c]+b-Y[i][c])**2;res[i]=Math.sqrt(e/3);if(w[i]){ss+=res[i]**2;cnt++}}
+    const sg=Math.sqrt(ss/Math.max(1,cnt));w=w.map((_,i)=>res[i]<2.5*sg+.004?1:0);
+  }
+  return{M:[a,0,0,0,a,0,0,0,a],b:[b,b,b]};
+}
+function fitColor(X,Y,full){ // X: [[r,g,b]...] détail ; Y: cible ; retourne {M,b}
+  const n=X.length,M=[1,0,0,0,1,0,0,0,1],B=[0,0,0];let w=new Float32Array(n).fill(1);
+  for(let it=0;it<3;it++){
+    for(let c=0;c<3;c++){
+      const idx=full?[0,1,2]:[c],k=idx.length+1,AtA=Array.from({length:k},()=>new Array(k).fill(0)),Atb=new Array(k).fill(0);
+      for(let i=0;i<n;i++){if(!w[i])continue;const f=[...idx.map(j=>X[i][j]),1],y=Y[i][c];for(let a=0;a<k;a++){Atb[a]+=f[a]*y;for(let b=0;b<k;b++)AtA[a][b]+=f[a]*f[b]}}
+      for(let a=0;a<k-1;a++)AtA[a][a]+=1e-3*n*.01;
+      const s=solve(AtA,Atb);if(!s)continue;
+      for(let a=0;a<3;a++)M[c*3+a]=0;idx.forEach((j,a)=>M[c*3+j]=s[a]);B[c]=s[k-1];
+    }
+    const res=new Float32Array(n);let ss=0,cnt=0;
+    for(let i=0;i<n;i++){let e=0;for(let c=0;c<3;c++){const p=M[c*3]*X[i][0]+M[c*3+1]*X[i][1]+M[c*3+2]*X[i][2]+B[c];e+=(p-Y[i][c])**2}res[i]=Math.sqrt(e/3);if(w[i]){ss+=res[i]**2;cnt++}}
+    const sg=Math.sqrt(ss/Math.max(1,cnt));w=w.map((_,i)=>res[i]<2.5*sg+.004?1:0);
+  }
+  return{M,b:B};
+}
+$('#bColor').onclick=()=>runColor($('#sColor').value);
+$('#bLC').onclick=()=>runColor('lc');
+async function runColor(mode){
+  const L=selLayer();if(!L||S.busy)return;S.busy=true;updateButtons();
+  try{
+    setStatus('Calage colorimétrique…',false,.4);await tick();
+    const xs=L.corners.map(c=>c[0]),ys=L.corners.map(c=>c[1]);
+    const x0=Math.max(0,Math.floor(Math.min(...xs))),y0=Math.max(0,Math.floor(Math.min(...ys))),x1=Math.min(S.base.w,Math.ceil(Math.max(...xs))),y1=Math.min(S.base.h,Math.ceil(Math.max(...ys)));
+    const rw=x1-x0,rh=y1-y0;if(rw<8||rh<8){setStatus('Le détail est hors de l’image d’ensemble : placez-le d’abord.',true);return}
+    const k=Math.min(1,700/Math.max(rw,rh)),w=Math.max(8,Math.round(rw*k)),h=Math.max(8,Math.round(rh*k));
+    const com={ox:x0,oy:y0,sx:w/rw,sy:h/rh,outW:w,outH:h};
+    const Tb=renderRegion({...com,list:[{L:S.base}]});
+    const saved=L.color.fit;L.color.fit=null;const Ib=renderRegion({...com,list:[{L,raw:true}]});L.color.fit=saved;
+    // zone intérieure (hors bords) – pas de pixels saturés
+    const X=[],Y=[];const step=Math.max(1,Math.floor(Math.sqrt(w*h/40000)));
+    const m=Math.round(Math.min(w,h)*.04);
+    for(let y=m;y<h-m;y+=step)for(let x=m;x<w-m;x+=step){const i=(y*w+x)*4;if(Ib[i+3]<250)continue;const a=[Ib[i]/255,Ib[i+1]/255,Ib[i+2]/255],b=[Tb[i]/255,Tb[i+1]/255,Tb[i+2]/255];
+      if(Math.max(...a)>.985||Math.max(...b)>.985)continue;X.push(a);Y.push(b)}
+    if(X.length<200){setStatus('Zone de recouvrement trop petite pour caler les couleurs.',true);return}
+    const f=mode==='lc'?fitLumContrast(X,Y):fitColor(X,Y,mode==='full');
+    L.color={fit:f,ev:0,contrast:1,sat:1,warm:0,tint:0};syncControls();S.dirty=true;
+    setStatus(`Couleurs calées sur ${X.length} points de comparaison. Affinez au besoin avec les curseurs.`);
+  }catch(e){console.error(e);setStatus('Erreur colorimétrie : '+e.message,true)}
+  finally{S.busy=false;updateButtons()}
+}
+
+/* ---------- export ---------- */
+const MOBILE=/iPhone|iPad|Android/i.test(navigator.userAgent);
+const MP_MAX=MOBILE?24:120;
+function zoneRect(){
+  if($('#eZone').value==='det'&&S.layers.length){
+    const xs=[],ys=[];for(const L of S.layers){if(!L.visible)continue;for(let i=0;i<4;i++){for(const[u,v]of[[0,0],[1,0],[1,1],[0,1],[.5,0],[1,.5],[.5,1],[0,.5]]){const p=layerPoint(L,u,v);xs.push(p[0]);ys.push(p[1])}}}
+    if(xs.length){const x0=Math.max(0,Math.floor(Math.min(...xs))),y0=Math.max(0,Math.floor(Math.min(...ys))),x1=Math.min(S.base.w,Math.ceil(Math.max(...xs))),y1=Math.min(S.base.h,Math.ceil(Math.max(...ys)));if(x1>x0&&y1>y0)return{x0,y0,w:x1-x0,h:y1-y0}}
+  }
+  return{x0:0,y0:0,w:S.base.w,h:S.base.h};
+}
+function suggestScale(){
+  let best=1;for(const L of S.layers){if(!L.visible)continue;const d=(a,b)=>Math.hypot(L.corners[a][0]-L.corners[b][0],L.corners[a][1]-L.corners[b][1]);
+    const sx=L.w/((d(0,1)+d(3,2))/2),sy=L.h/((d(0,3)+d(1,2))/2),s=Math.sqrt(sx*sy);if(isFinite(s))best=Math.max(best,s)}
+  return best;
+}
+function expDims(){const z=zoneRect(),s=+$('#eScale').value||1;return{W:Math.round(z.w*s),H:Math.round(z.h*s),s,z}}
+function updExport(){
+  const d=expDims(),mp=d.W*d.H/1e6;$('#eInfo').innerHTML=`Sortie : <span class="big">${d.W} × ${d.H} px</span> (${mp.toFixed(1)} Mpx)`+(S.pxPerMm?`<br>Taille réelle : ${fmtLen(d.z.w/S.pxPerMm)} × ${fmtLen(d.z.h/S.pxPerMm)}`:'');$('#eBarRow').style.display=S.pxPerMm?'':'none';
+  let w='';if(d.W>16384||d.H>16384)w='Dimension supérieure à 16 384 px : la plupart des navigateurs refuseront.';else if(mp>MP_MAX)w=`Au-delà de ~${MP_MAX} Mpx, ${MOBILE?'cet appareil':'le navigateur'} risque de manquer de mémoire.`;
+  $('#eWarn').textContent=w;$('#eQRow').style.display=$('#eFmt').value==='jpg'?'':'none';
+  if($('#eBg').value==='none'&&$('#eFmt').value==='jpg'){$('#eFmt').value='png';updExport()}
+}
+$('#bExport').onclick=()=>{if(!S.base)return;$('#eScale').value=Math.min(+suggestScale().toFixed(2),Math.max(.25,Math.sqrt(MP_MAX*1e6*.6/(S.base.w*S.base.h))));$('#modal').hidden=false;updExport()};
+['eZone','eBg','eScale','eFmt'].forEach(id=>$('#'+id).addEventListener('input',updExport));
+$('#eCancel').onclick=()=>{if(!exporting)$('#modal').hidden=true};
+let exporting=false;
+function drawExportBar(ctx,W,H,ppmm){
+  let v=null;for(const c of NICE){if(c*ppmm<=W*.2)v=c}if(!v)return;
+  const len=v*ppmm,fs=Math.max(14,Math.round(Math.min(W,H)/70)),pad=Math.round(fs*.7),barH=Math.max(6,Math.round(fs*.55)),mg=Math.round(fs*1.2);
+  ctx.font=`600 ${fs}px system-ui,sans-serif`;const lab=fmtLen(v),tw=ctx.measureText(lab).width;
+  const bw=Math.round(len+tw/2+pad*2+fs),bh=Math.round(barH+fs*1.5+pad*2),x=mg,y=H-mg-bh;
+  ctx.fillStyle='rgba(255,255,255,.88)';ctx.fillRect(x,y,bw,bh);
+  const kseg=barSegs(v),bx=x+pad+fs*.3,by=y+pad+fs*1.35,seg=len/kseg;
+  for(let i=0;i<kseg;i++){ctx.fillStyle=i%2?'#fff':'#111';ctx.fillRect(bx+i*seg,by,seg,barH)}
+  ctx.lineWidth=Math.max(1,fs/12);ctx.strokeStyle='#111';ctx.strokeRect(bx,by,len,barH);
+  ctx.fillStyle='#111';ctx.textBaseline='alphabetic';ctx.textAlign='center';ctx.fillText('0',bx,by-fs*.35);ctx.fillText(lab,bx+len,by-fs*.35);
+}
+let crcT=null;function crc32(b){if(!crcT){crcT=new Uint32Array(256);for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++)c=c&1?0xEDB88320^(c>>>1):c>>>1;crcT[n]=c>>>0}}let c=0xFFFFFFFF;for(let i=0;i<b.length;i++)c=crcT[(c^b[i])&255]^(c>>>8);return(c^0xFFFFFFFF)>>>0}
+async function withDensity(blob,fmt,ppmm){ // ajoute la densité réelle (ppp) dans les métadonnées pour une ouverture à taille réelle
+  try{
+    const buf=new Uint8Array(await blob.arrayBuffer());
+    if(fmt==='png'){
+      const ppu=Math.round(ppmm*1000),d=new Uint8Array(13);const dv=new DataView(d.buffer);
+      d.set([0x70,0x48,0x59,0x73],0);dv.setUint32(4,ppu);dv.setUint32(8,ppu);d[12]=1; // 'pHYs'
+      const chunk=new Uint8Array(21),cv2=new DataView(chunk.buffer);cv2.setUint32(0,9);chunk.set(d,4);cv2.setUint32(17,crc32(d));
+      const out=new Uint8Array(buf.length+21);out.set(buf.subarray(0,33),0);out.set(chunk,33);out.set(buf.subarray(33),54);return new Blob([out],{type:'image/png'});
+    }
+    if(buf[2]===0xFF&&buf[3]===0xE0&&buf[6]===0x4A&&buf[7]===0x46){const dpi=Math.min(65535,Math.round(ppmm*25.4));buf[13]=1;buf[14]=dpi>>8;buf[15]=dpi&255;buf[16]=dpi>>8;buf[17]=dpi&255;return new Blob([buf],{type:'image/jpeg'})}
+  }catch(e){console.error(e)}
+  return blob;
+}
+async function saveBlob(name,blob){
+  let dl=null;try{dl=await claude.use('downloads')}catch(e){}
+  if(dl){try{await dl.save({filename:name,data:blob});return true}catch(e){if(e&&e.code==='declined')return false;throw e}}
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();a.remove();return true;
+}
+$('#eGo').onclick=async()=>{
+  if(exporting)return;const d=expDims();
+  if(d.W>32000||d.H>32000||d.W*d.H>400e6){$('#eWarn').textContent='Trop grand pour être généré.';return}
+  exporting=true;$('#eGo').disabled=true;$('#eBarWrap').style.display='block';const bar=$('#bar2').firstElementChild,st=$('#eStat');
+  try{
+    const cvs=document.createElement('canvas');cvs.width=d.W;cvs.height=d.H;const ctx=cvs.getContext('2d');
+    if(!ctx||cvs.width!==d.W)throw new Error('canvas trop grand pour ce navigateur');
+    const transparent=$('#eBg').value==='none',fmt=$('#eFmt').value;
+    const list=[];if(!transparent)list.push({L:S.base});for(const L of S.layers)if(L.visible)list.push({L});
+    const T=Math.min(2048,MAXRB),nx=Math.ceil(d.W/T),ny=Math.ceil(d.H/T);let done=0;
+    for(let ty=0;ty<ny;ty++)for(let tx=0;tx<nx;tx++){
+      const px=tx*T,py=ty*T,tw=Math.min(T,d.W-px),th=Math.min(T,d.H-py);
+      const buf=renderRegion({ox:d.z.x0+px/d.s,oy:d.z.y0+py/d.s,sx:d.s,sy:d.s,outW:tw,outH:th,list});
+      if(transparent){for(let i=0;i<buf.length;i+=4){const a=buf[i+3];if(a>0&&a<255){const k=255/a;buf[i]=Math.min(255,buf[i]*k);buf[i+1]=Math.min(255,buf[i+1]*k);buf[i+2]=Math.min(255,buf[i+2]*k)}}}
+      else for(let i=3;i<buf.length;i+=4)buf[i]=255;
+      ctx.putImageData(new ImageData(new Uint8ClampedArray(buf.buffer),tw,th),px,py);
+      done++;bar.style.width=(done/(nx*ny)*90)+'%';st.textContent=`Rendu : tuile ${done}/${nx*ny}`;await tick(4);
+    }
+    const ppmmOut=S.pxPerMm?S.pxPerMm*d.s:0;
+    if(ppmmOut&&$('#eScaleBar').checked)drawExportBar(ctx,d.W,d.H,ppmmOut);
+    st.textContent='Encodage de l’image…';await tick();
+    let blob=await new Promise((res,rej)=>cvs.toBlob(b=>b?res(b):rej(new Error('encodage refusé (image trop grande ?)')),fmt==='png'?'image/png':'image/jpeg',+$('#eQ').value));
+    if(ppmmOut)blob=await withDensity(blob,fmt,ppmmOut);
+    bar.style.width='100%';
+    const base=(S.base.name||'tableau').replace(/\.[^.]+$/,'');
+    const ok=await saveBlob(`${base}-recompose.${fmt}`,blob);
+    st.textContent=ok?`Terminé : ${(blob.size/1048576).toFixed(1)} Mo.`:'Enregistrement annulé.';
+  }catch(e){console.error(e);st.textContent='Échec : '+(e&&e.message||e);$('#eWarn').textContent='Essayez une échelle plus petite.'}
+  finally{exporting=false;$('#eGo').disabled=false;gl.bindFramebuffer(gl.FRAMEBUFFER,null);S.dirty=true}
+};
+$('#eJson').onclick=async()=>{
+  const o={version:1,scale:S.pxPerMm?{pxPerMm:S.pxPerMm,ref:S.calib.ref}:null,base:{name:S.base.name,w:S.base.w,h:S.base.h},layers:S.layers.map(L=>({name:L.name,pxPerMm:S.pxPerMm?layerRes(L).pxmm:null,w:L.w,h:L.h,corners:L.corners,grid:L.grid,opacity:L.opacity,feather:L.feather,color:L.color,located:L.located}))};
+  try{await saveBlob('reglages-recalage.json',new Blob([JSON.stringify(o,null,1)],{type:'application/json'}))}catch(e){$('#eStat').textContent='Échec : '+e.message;$('#eBarWrap').style.display='block'}
+};
+
+/* ---------- démarrage ---------- */
+for(const ev of['gesturestart','gesturechange','gestureend'])document.addEventListener(ev,e=>e.preventDefault());
+window.__S=S;window.__dbg={resetCV,locate,renderRegion,eccRefine,select,fitView,updateLayer};
+resize();updateButtons();refreshList();
+new ResizeObserver(()=>{resize()}).observe($('#stage'));
+</script>
+</body>
+</html>
