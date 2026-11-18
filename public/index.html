@@ -95,6 +95,7 @@ input[type=text],input[type=number],select{background:var(--bg);color:var(--tx);
   <div class="hb">
     <label class="btn">Image d’ensemble<input type="file" id="fBase" accept="image/*" hidden></label>
     <label class="btn dis" id="lblDet">+ Détails<input type="file" id="fDet" accept="image/*" multiple hidden></label>
+    <label class="btn">Ouvrir réglages<input type="file" id="fProj" accept=".json,application/json,image/*" multiple hidden></label>
     <button class="btn primary dis" id="bExport">Exporter</button>
   </div>
 </header>
@@ -755,6 +756,7 @@ async function setBase(file){
   try{
     const bmp=await loadBitmap(file),r=await cropDialog(bmp);
     if(!r){bmp.close&&bmp.close();hint();setStatus(S.base?'Chargement annulé.':'Chargez la photo d’ensemble.');return}
+    r.__src=[bmp.width,bmp.height];
     await setBaseSource(r,file.name);bmp.close&&bmp.close();
   }catch(err){setStatus('Impossible de lire cette image : '+err.message,true)}
 }
@@ -765,7 +767,7 @@ async function setBaseSource(bmp,name){
     for(const L of S.layers){gl.deleteTexture(L.tex);L.work=null}S.layers=[];S.sel=null;S.baseFeat=null;S.pxPerMm=null;S.calib={active:false,pts:[],ref:null};syncCalib();updScaleInfo();
     if(S.base)gl.deleteTexture(S.base.tex);
     const B={isBase:true,name,work,thumb:thumbOf(bmp),w:bmp.width,h:bmp.height,tex:t.tex,corners:[[0,0],[bmp.width,0],[bmp.width,bmp.height],[0,bmp.height]],grid:null};
-    B.H=hFromQuad(B.corners);buildMesh(B);S.base=B;
+    B.crop=bmp.__crop||null;B.src=bmp.__src||null;B.H=hFromQuad(B.corners);buildMesh(B);S.base=B;
     if(bmp.__pxPerMm){S.pxPerMm=bmp.__pxPerMm;updScaleInfo();S.showScale=true;syncCalib();}
     resize();fitView();hint();updateButtons();refreshList();syncControls();
     setStatus(`Image d’ensemble : ${bmp.width}×${bmp.height} px.${t.note?' ('+t.note+')':''} Ajoutez maintenant des détails.`);
@@ -870,14 +872,14 @@ function cropDialog(bmp){return new Promise(resolve=>{
     $('#cropOk').disabled=true;await tick();
     try{
       const[ow,oh]=outSize(),rect=isRect()&&!aspect(),rw0=+$('#cropRW').value,rh0=+$('#cropRH').value;
-      const cal=o=>{if(rw0>0)o.__pxPerMm=ow/(rw0*10);else if(rh0>0)o.__pxPerMm=oh/(rh0*10);return o};
+      const cal=(o,crop)=>{if(rw0>0)o.__pxPerMm=ow/(rw0*10);else if(rh0>0)o.__pxPerMm=oh/(rh0*10);o.__crop=crop;return o};
       if(rect){
         const x0=Math.min(Q[0][0],Q[3][0]),y0=Math.min(Q[0][1],Q[1][1]),x1=Math.max(Q[1][0],Q[2][0]),y1=Math.max(Q[3][1],Q[2][1]);
         if(x0<.5&&y0<.5&&x1>W-1&&y1>H-1&&ow===W&&oh===H&&!(rw0>0||rh0>0))return close(bmp);
         const rx=Math.round(x0),ry=Math.round(y0),rw=Math.max(1,Math.round(x1-x0)),rh=Math.max(1,Math.round(y1-y0));
         const c=document.createElement('canvas');c.width=rw;c.height=rh;c.getContext('2d').drawImage(bmp,rx,ry,rw,rh,0,0,rw,rh);
-        close(cal(ow===rw&&oh===rh?c:downscaleCanvas(c,ow,oh)));
-      }else close(cal(warpQuad(bmp,Q,ow,oh)));
+        close(cal(ow===rw&&oh===rh?c:downscaleCanvas(c,ow,oh),{rect:[rx,ry,rw,rh],ow,oh}));
+      }else close(cal(warpQuad(bmp,Q,ow,oh),{Q:Q.map(c=>c.slice()),ow,oh}));
     }catch(err){setStatus('Recadrage impossible : '+err.message,true);close(null)}
     finally{$('#cropOk').disabled=false}
   };
@@ -906,9 +908,9 @@ async function addDetails(files){
 $('#fBase').onchange=e=>{if(e.target.files[0])setBase(e.target.files[0]);e.target.value=''};
 $('#fBase2').onchange=e=>{if(e.target.files[0])setBase(e.target.files[0]);e.target.value=''};
 $('#fDet').onchange=e=>{const f=[...e.target.files];e.target.value='';if(f.length)addDetails(f)};
-for(const ev of['dragover','drop'])window.addEventListener(ev,e=>{e.preventDefault();if(ev==='drop'){const f=[...e.dataTransfer.files].filter(x=>x.type.startsWith('image/'));if(!f.length)return;if(!S.base)setBase(f[0]).then(()=>f.length>1&&addDetails(f.slice(1)));else addDetails(f)}});
+for(const ev of['dragover','drop'])window.addEventListener(ev,e=>{e.preventDefault();if(ev==='drop'){const all=[...e.dataTransfer.files];if(all.some(x=>/\.json$/i.test(x.name)))return openProject(all);const f=all.filter(x=>x.type.startsWith('image/'));if(!f.length)return;if(!S.base)setBase(f[0]).then(()=>f.length>1&&addDetails(f.slice(1)));else addDetails(f)}});
 
-glc.addEventListener('webglcontextlost',e=>{e.preventDefault();setStatus('La mémoire graphique est saturée : retirez des détails ou rechargez la page (les réglages ne sont pas conservés).',true)});
+glc.addEventListener('webglcontextlost',e=>{e.preventDefault();setStatus('La mémoire graphique est saturée : retirez des détails ou rechargez la page (enregistrez vos réglages en .json pour les rouvrir ensuite).',true)});
 window.addEventListener('unhandledrejection',e=>{console.error(e.reason);setStatus('Erreur : '+((e.reason&&e.reason.message)||e.reason),true)});
 window.addEventListener('error',e=>{setStatus('Erreur : '+e.message,true)});
 /* ---------- OpenCV ---------- */
@@ -1281,9 +1283,75 @@ $('#eGo').onclick=async()=>{
   finally{exporting=false;$('#eGo').disabled=false;gl.bindFramebuffer(gl.FRAMEBUFFER,null);S.dirty=true}
 };
 $('#eJson').onclick=async()=>{
-  const o={version:1,scale:S.pxPerMm?{pxPerMm:S.pxPerMm,ref:S.calib.ref}:null,base:{name:S.base.name,w:S.base.w,h:S.base.h},layers:S.layers.map(L=>({name:L.name,pxPerMm:S.pxPerMm?layerRes(L).pxmm:null,w:L.w,h:L.h,corners:L.corners,grid:L.grid,opacity:L.opacity,feather:L.feather,color:L.color,located:L.located}))};
+  const num=a=>a?Array.from(Object.values(a)):a;
+  const o={version:2,scale:S.pxPerMm?{pxPerMm:S.pxPerMm,ref:S.calib.ref}:null,
+    base:{name:S.base.name,w:S.base.w,h:S.base.h,src:S.base.src,crop:S.base.crop},
+    layers:S.layers.map(L=>({name:L.name,pxPerMm:S.pxPerMm?layerRes(L).pxmm:null,w:L.w,h:L.h,corners:L.corners,grid:L.grid,opacity:L.opacity,feather:L.feather,
+      color:{...L.color,fit:L.color.fit?{...L.color.fit,M:num(L.color.fit.M),b:num(L.color.fit.b)}:null},
+      located:L.located,visible:L.visible,locked:!!L.locked,mask:(L.maskC&&L.maskOn)?L.maskC.toDataURL('image/png'):null}))};
   try{await saveBlob('reglages-recalage.json',new Blob([JSON.stringify(o,null,1)],{type:'application/json'}))}catch(e){$('#eStat').textContent='Échec : '+e.message;$('#eBarWrap').style.display='block'}
 };
+
+/* ---------- ouverture d’un fichier de réglages (.json) + photos ---------- */
+async function openProject(files){
+  if(S.busy)return;
+  const jf=files.find(f=>/\.json$/i.test(f.name)||f.type==='application/json');
+  if(!jf){setStatus('Aucun fichier de réglages (.json) dans la sélection.',true);return}
+  let P;try{P=JSON.parse(await jf.text())}catch(e){setStatus('Fichier de réglages illisible : '+e.message,true);return}
+  if(!P||!P.base||!Array.isArray(P.layers)){setStatus('Ce fichier n’est pas un fichier de réglages de l’atelier.',true);return}
+  const imgs=files.filter(f=>f!==jf),used=new Set(),stem=n=>n.replace(/\.[^.]+$/,'');
+  const take=pred=>{const f=imgs.find(x=>!used.has(x)&&pred(x));if(f)used.add(f);return f};
+  const reuse=!!S.base&&S.base.name===P.base.name&&S.base.w===P.base.w&&S.base.h===P.base.h;
+  const bf=reuse?null:take(f=>f.name===P.base.name);
+  if(!reuse&&!bf){setStatus('Sélectionnez aussi la photo d’ensemble « '+P.base.name+' » (avec le .json et les photos de détail, en une seule fois).',true);return}
+  S.busy=true;updateButtons();
+  const skipped=[],missing=[];let n=0;
+  try{
+    if(reuse){
+      for(const L of S.layers){gl.deleteTexture(L.tex);if(L.maskTex)gl.deleteTexture(L.maskTex);L.work=null}
+      S.layers=[];S.sel=null;
+    }else{
+      setStatus('Chargement de l’image d’ensemble…',false,.1);await tick();
+      const bmp=await loadBitmap(bf),c=P.base.crop;let out;
+      if(c&&c.rect){const[rx,ry,rw,rh]=c.rect,cv=document.createElement('canvas');cv.width=rw;cv.height=rh;cv.getContext('2d').drawImage(bmp,rx,ry,rw,rh,0,0,rw,rh);out=(c.ow===rw&&c.oh===rh)?cv:downscaleCanvas(cv,c.ow,c.oh)}
+      else if(c&&c.Q)out=warpQuad(bmp,c.Q,c.ow,c.oh);
+      else out=bmp;
+      if(out.width!==P.base.w||out.height!==P.base.h){
+        bmp.close&&bmp.close();
+        throw new Error(`l’image d’ensemble fait ${bmp.width}×${bmp.height} px alors que les réglages attendent ${P.base.w}×${P.base.h}`+(c?'.':' (ce fichier ne contient pas le recadrage : réenregistrez-le depuis une version à jour de l’atelier).'));
+      }
+      out.__crop=c||null;out.__src=P.base.src||[bmp.width,bmp.height];
+      await setBaseSource(out,bf.name);bmp.close&&bmp.close();
+      if(!S.base||S.base.name!==bf.name)throw new Error('image d’ensemble non chargée');
+    }
+    if(P.scale&&P.scale.pxPerMm){S.pxPerMm=P.scale.pxPerMm;S.calib.ref=P.scale.ref||null;S.showScale=true;syncCalib();updScaleInfo()}
+    S.showAll=true;syncShow();
+    for(const PL of P.layers){
+      const f=take(x=>stem(x.name)===PL.name);
+      if(!f){missing.push(PL.name);continue}
+      setStatus('Chargement de '+f.name+'…',false,.1+.8*(++n/P.layers.length));await tick();
+      const bmp=await loadBitmap(f);
+      if(bmp.width!==PL.w||bmp.height!==PL.h){skipped.push(PL.name+' ('+bmp.width+'×'+bmp.height+' au lieu de '+PL.w+'×'+PL.h+')');bmp.close&&bmp.close();continue}
+      const L=newLayer(f,bmp,makeTexture(bmp)),cp=a=>JSON.parse(JSON.stringify(a));
+      L.name=PL.name;L.corners=cp(PL.corners);L.grid=PL.grid?cp(PL.grid):null;
+      if(PL.opacity!=null)L.opacity=PL.opacity;if(PL.feather!=null)L.feather=PL.feather;
+      if(PL.color){L.color=Object.assign({fit:null,ev:0,contrast:1,sat:1,warm:0,tint:0},cp(PL.color));if(L.color.fit){L.color.fit.M=Array.from(Object.values(L.color.fit.M));L.color.fit.b=Array.from(Object.values(L.color.fit.b))}}
+      L.located=!!PL.located;L.visible=PL.visible!==false;L.locked=!!PL.locked;
+      updateLayer(L);
+      if(PL.mask){try{ensureMask(L);const im=new Image();im.src=PL.mask;await im.decode();L.maskC.getContext('2d').drawImage(im,0,0,L.maskC.width,L.maskC.height);uploadMask(L)}catch(e){console.warn('masque non restauré',e)}}
+      S.layers.push(L);S.sel=L.id;
+    }
+    S.tool='view';[...$('#segTool').children].forEach(b=>b.classList.toggle('on',b.dataset.v==='view'));
+    refreshList();syncControls();fitView();hint();S.dirty=true;
+    const ign=imgs.filter(x=>!used.has(x)).length;
+    setStatus(`Réglages chargés : ${S.layers.length} détail${S.layers.length>1?'s':''} sur ${P.layers.length}.`
+      +(missing.length?' Photos manquantes : '+missing.join(', ')+'.':'')
+      +(skipped.length?' Dimensions différentes, ignorées : '+skipped.join(', ')+'.':'')
+      +(ign?' '+ign+' photo(s) non reconnue(s).':''),missing.length>0||skipped.length>0);
+  }catch(err){console.error(err);setStatus('Ouverture impossible : '+err.message,true)}
+  finally{S.busy=false;updateButtons()}
+}
+$('#fProj').onchange=e=>{const f=[...e.target.files];e.target.value='';if(f.length)openProject(f)};
 
 /* ---------- démarrage ---------- */
 for(const ev of['gesturestart','gesturechange','gestureend'])document.addEventListener(ev,e=>e.preventDefault());
