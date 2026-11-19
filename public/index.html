@@ -108,6 +108,8 @@ details>summary{cursor:pointer;color:var(--mut);font-size:11px;text-transform:up
         <label class="mi">Image d’ensemble…<input type="file" id="fBase" accept="image/*" hidden></label>
         <label class="mi">Ouvrir des réglages…<input type="file" id="fProj" accept=".json,application/json,image/*" multiple hidden></label>
         <button class="mi dis" id="mJson">Enregistrer les réglages (.json)</button>
+        <button class="mi dis" id="mPlate" title="Image d’ensemble avec l’emprise numérotée de chaque détail, légende et coordonnées">Planche de localisation (.png)</button>
+        <button class="mi dis" id="mCsv" title="Position et taille de chaque détail sur l’image d’ensemble">Coordonnées (.csv)</button>
       </div></div>
     <button class="btn primary dis" id="bExport">Exporter</button>
   </div>
@@ -778,7 +780,7 @@ $('#bEUndo').onclick=()=>{undoErase(selLayer());syncErase()};
 setSeg('#segMode','mode',()=>{$('#miniDiff').hidden=S.mode!=='diff';$('#miniCurt').hidden=S.mode!=='curtain'});
 $('#rGain').oninput=e=>{S.gain=+e.target.value;S.dirty=true};$('#rSplit').oninput=e=>{S.split=+e.target.value;S.dirty=true};
 $('#bFit').onclick=fitView;
-function updateButtons(){const has=!!S.base;$('#lblDet').classList.toggle('dis',!has||S.busy);$('#bExport').classList.toggle('dis',!has||S.busy);$('#mJson').classList.toggle('dis',!has||S.busy);$('#empty').hidden=has;$('#tools').hidden=!has;$('#modes').hidden=!has;
+function updateButtons(){const has=!!S.base;$('#lblDet').classList.toggle('dis',!has||S.busy);$('#bExport').classList.toggle('dis',!has||S.busy);$('#mJson').classList.toggle('dis',!has||S.busy);for(const id of['mPlate','mCsv'])$('#'+id).classList.toggle('dis',!has||S.busy||!S.layers.length);$('#empty').hidden=has;$('#tools').hidden=!has;$('#modes').hidden=!has;
   for(const id of['bLocate','bRefine','bColor','bLC','bDel'])$('#'+id).disabled=S.busy&&id!=='bDel'}
 
 /* ---------- chargement des images ---------- */
@@ -1336,6 +1338,79 @@ async function saveJson(){
   catch(e){setStatus('Échec de l’enregistrement : '+e.message,true)}
 }
 $('#eJson').onclick=saveJson;$('#mJson').onclick=saveJson;
+
+/* ---------- référencement des détails sur l’image d’ensemble ---------- */
+const nf=(v,d=1)=>v.toFixed(d).replace('.',',');
+function placements(){
+  const mm=S.pxPerMm,B=S.base;
+  return S.layers.map((L,i)=>{
+    const pts=[[0,0],[.5,0],[1,0],[1,.5],[1,1],[.5,1],[0,1],[0,.5]].map(([u,v])=>layerPoint(L,u,v)),
+      xs=pts.map(p=>p[0]),ys=pts.map(p=>p[1]),x0=Math.min(...xs),x1=Math.max(...xs),y0=Math.min(...ys),y1=Math.max(...ys);
+    return{n:i+1,name:L.name,poly:pts,x:x0,y:y0,w:x1-x0,h:y1-y0,cx:(x0+x1)/2,cy:(y0+y1)/2,
+      cm:mm?{x:x0/mm/10,y:y0/mm/10,w:(x1-x0)/mm/10,h:(y1-y0)/mm/10}:null,located:L.located,
+      px:L.w>0&&mm?layerRes(L).pxmm:null};
+  });
+}
+async function saveCsv(){
+  if(!S.base||!S.layers.length){setStatus('Ajoutez d’abord des détails.',true);return}
+  const mm=S.pxPerMm,B=S.base,P=placements();
+  const head=['n°','nom','x (px)','y (px)','largeur (px)','hauteur (px)','x (%)','y (%)','largeur (%)','hauteur (%)','centre x (%)','centre y (%)']
+    .concat(mm?['x (cm)','y (cm)','largeur (cm)','hauteur (cm)','résolution du détail (px/mm)']:[]).concat(['localisé']);
+  const rows=P.map(p=>[p.n,'"'+p.name.replace(/"/g,'""')+'"',nf(p.x,0),nf(p.y,0),nf(p.w,0),nf(p.h,0),nf(p.x/B.w*100),nf(p.y/B.h*100),nf(p.w/B.w*100),nf(p.h/B.h*100),nf(p.cx/B.w*100),nf(p.cy/B.h*100)]
+    .concat(mm?[nf(p.cm.x),nf(p.cm.y),nf(p.cm.w),nf(p.cm.h),nf(p.px,2)]:[]).concat([p.located?'oui':'non']));
+  const txt='\ufeff'+[head.join(';')].concat(rows.map(r=>r.join(';'))).join('\r\n')+'\r\n';
+  try{await saveBlob('coordonnees-details.csv',new Blob([txt],{type:'text/csv;charset=utf-8'}));setStatus('Coordonnées enregistrées. Origine : coin supérieur gauche de l’image d’ensemble.')}
+  catch(e){setStatus('Échec de l’enregistrement : '+e.message,true)}
+}
+async function savePlate(){
+  if(!S.base||!S.layers.length){setStatus('Ajoutez d’abord des détails.',true);return}
+  setStatus('Création de la planche…',false,.3);await tick();
+  try{
+    const B=S.base,mm=S.pxPerMm,P=placements(),src=B.work,W0=Math.max(1600,src.width),k=W0/B.w,u=W0/1600;
+    const pad=Math.round(40*u),imgW=W0,imgH=Math.round(B.h*k),rowH=Math.round(30*u),colors=['#e6194b','#3cb44b','#f58231','#4363d8','#911eb4','#008c8c','#c2185b','#7a9a01','#8d5524','#000075'];
+    const headH=Math.round(70*u),legH=Math.round(34*u)+P.length*rowH+Math.round(56*u);
+    const c=document.createElement('canvas');c.width=imgW+2*pad;c.height=headH+imgH+Math.round(24*u)+legH+pad;
+    const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);
+    x.fillStyle='#111';x.font=`600 ${Math.round(26*u)}px system-ui,sans-serif`;x.textBaseline='alphabetic';
+    x.fillText('Planche de localisation des détails',pad,Math.round(44*u));
+    const oy=headH;x.imageSmoothingQuality='high';x.drawImage(src,pad,oy,imgW,imgH);
+    x.lineJoin='round';
+    for(const p of P){
+      const col=colors[(p.n-1)%colors.length];
+      x.beginPath();p.poly.forEach((q,i)=>{const X=pad+q[0]*k,Y=oy+q[1]*k;i?x.lineTo(X,Y):x.moveTo(X,Y)});x.closePath();
+      x.fillStyle=col+'33';x.fill();x.strokeStyle=col;x.lineWidth=Math.max(2,3*u);x.stroke();
+    }
+    for(const p of P){ // pastilles numérotées
+      const col=colors[(p.n-1)%colors.length],r=Math.round(15*u),cx=pad+p.cx*k,cy=oy+p.cy*k;
+      x.beginPath();x.arc(cx,cy,r,0,7);x.fillStyle=col;x.fill();x.lineWidth=2*u;x.strokeStyle='#fff';x.stroke();
+      x.fillStyle='#fff';x.font=`700 ${Math.round(16*u)}px system-ui,sans-serif`;x.textAlign='center';x.textBaseline='middle';x.fillText(String(p.n),cx,cy+1);
+    }
+    x.textAlign='left';x.textBaseline='alphabetic';
+    let y=oy+imgH+Math.round(24*u);
+    const cols=mm?[0,48,330,560,760,990,1190]:[0,48,330,600,900,1200],hd=mm?['N°','Détail','Position (x ; y) en cm','Taille (l × h) en cm','Position en % de l’image','Taille en % de l’image']:['N°','Détail','Position (x ; y) en px','Taille (l × h) en px','Position en % de l’image'];
+    const cx0=pad;x.fillStyle='#555';x.font=`600 ${Math.round(14*u)}px system-ui,sans-serif`;
+    hd.forEach((t,i)=>x.fillText(t,cx0+cols[i]*u,y+Math.round(8*u)));
+    x.strokeStyle='#bbb';x.lineWidth=1;x.beginPath();x.moveTo(pad,y+Math.round(16*u));x.lineTo(pad+imgW,y+Math.round(16*u));x.stroke();
+    y+=Math.round(16*u);
+    x.font=`${Math.round(15*u)}px system-ui,sans-serif`;
+    for(const p of P){
+      y+=rowH;const col=colors[(p.n-1)%colors.length];
+      x.fillStyle=col;x.fillRect(cx0,y-Math.round(17*u),Math.round(26*u),Math.round(22*u));x.fillStyle='#fff';x.textAlign='center';x.font=`700 ${Math.round(14*u)}px system-ui,sans-serif`;x.fillText(String(p.n),cx0+Math.round(13*u),y);
+      x.textAlign='left';x.fillStyle='#111';x.font=`${Math.round(15*u)}px system-ui,sans-serif`;
+      let nm=p.name;while(nm.length>3&&x.measureText(nm).width>(cols[2]-cols[1]-14)*u)nm=nm.slice(0,-2);if(nm!==p.name)nm=nm.trimEnd()+'…';
+      const vals=mm?[nm,`${nf(p.cm.x)} ; ${nf(p.cm.y)}`,`${nf(p.cm.w)} × ${nf(p.cm.h)}`,`${nf(p.x/B.w*100)} % ; ${nf(p.y/B.h*100)} %`,`${nf(p.w/B.w*100)} % × ${nf(p.h/B.h*100)} %`]
+        :[nm,`${nf(p.x,0)} ; ${nf(p.y,0)}`,`${nf(p.w,0)} × ${nf(p.h,0)}`,`${nf(p.x/B.w*100)} % ; ${nf(p.y/B.h*100)} %`];
+      vals.forEach((t,i)=>x.fillText(t,cx0+cols[i+1]*u,y));
+    }
+    y+=Math.round(34*u);x.fillStyle='#666';x.font=`${Math.round(13*u)}px system-ui,sans-serif`;
+    x.fillText(`Image d’ensemble : ${B.name} — ${B.w} × ${B.h} px`+(mm?` — champ ${fmtLen(B.w/mm)} × ${fmtLen(B.h/mm)}`:'')+'.',pad,y);
+    y+=Math.round(20*u);
+    x.fillText('Position = coin supérieur gauche de l’emprise du détail, l’origine étant le coin supérieur gauche de l’image d’ensemble.',pad,y);
+    const blob=await new Promise(r=>c.toBlob(r,'image/png'));
+    await saveBlob('planche-localisation.png',blob);setStatus('Planche de localisation enregistrée.');
+  }catch(e){console.error(e);setStatus('Échec de la planche : '+e.message,true)}
+}
+$('#mCsv').onclick=saveCsv;$('#mPlate').onclick=savePlate;
 
 /* ---------- ouverture d’un fichier de réglages (.json) + photos ---------- */
 async function openProject(files){
