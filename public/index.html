@@ -1354,7 +1354,7 @@ async function openProject(files){
       if(PL.mask){try{ensureMask(L);const im=new Image();im.src=PL.mask;await im.decode();L.maskC.getContext('2d').drawImage(im,0,0,L.maskC.width,L.maskC.height);uploadMask(L)}catch(e){console.warn('masque non restauré',e)}}
       S.layers.push(L);S.sel=L.id;
     }
-    S.tool='view';[...$('#segTool').children].forEach(b=>b.classList.toggle('on',b.dataset.v==='view'));
+    {const tv=S.layers.length?'corners':'view';S.tool=tv;[...$('#segTool').children].forEach(b=>b.classList.toggle('on',b.dataset.v===tv))}
     refreshList();syncControls();fitView();hint();S.dirty=true;
     const ign=imgs.filter(x=>!used.has(x)).length;
     setStatus(`Réglages chargés : ${S.layers.length} détail${S.layers.length>1?'s':''} sur ${P.layers.length}.`
