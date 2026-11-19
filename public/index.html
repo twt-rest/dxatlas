@@ -684,7 +684,10 @@ function refreshList(){
     const sp=document.createElement('span');sp.style.flex='0 0 8px';li.appendChild(sp);
     const eye=document.createElement('button');eye.className='ib'+(S.baseHidden?' off':'');eye.style.padding='6px';eye.title=S.baseHidden?'Afficher l’image d’ensemble':'Masquer l’image d’ensemble';eye.innerHTML=S.baseHidden?EYE_OFF:EYE_ON;
     eye.onclick=ev=>{ev.stopPropagation();S.baseHidden=!S.baseHidden;S.dirty=true;refreshList()};li.appendChild(eye);
-    li.appendChild(trashBtn(()=>clearBase(),'Supprimer l’image d’ensemble (retire aussi tous les détails)',false));
+    const lkb=document.createElement('button');lkb.className='ib'+(S.baseLocked?'':' off');lkb.style.padding='6px';if(S.baseLocked)lkb.style.color='var(--acc)';
+    lkb.title=S.baseLocked?'Déverrouiller l’image d’ensemble':'Verrouiller l’image d’ensemble (empêche de la remplacer ou de la supprimer)';lkb.innerHTML=S.baseLocked?LOCK_ON:LOCK_OFF;
+    lkb.onclick=ev=>{ev.stopPropagation();S.baseLocked=!S.baseLocked;refreshList();setStatus(S.baseLocked?'Image d’ensemble verrouillée.':'Image d’ensemble déverrouillée.')};li.appendChild(lkb);
+    li.appendChild(trashBtn(()=>clearBase(),'Supprimer l’image d’ensemble (retire aussi tous les détails)',!!S.baseLocked,'Déverrouillez l’image d’ensemble pour la supprimer.'));
     list.appendChild(li);
   }
 }
@@ -720,6 +723,7 @@ $('#bColorReset').onclick=()=>{const L=selLayer();if(!L)return;L.color={fit:null
 $('#bGridReset').onclick=()=>{const L=selLayer();if(!L||L.locked)return;L.grid=null;updateLayer(L)};
 function deleteLayer(L){if(!L||L.locked)return;gl.deleteTexture(L.tex);if(L.maskTex)gl.deleteTexture(L.maskTex);L.work=null;S.layers=S.layers.filter(x=>x!==L);if(S.sel===L.id)S.sel=S.layers.length?S.layers[S.layers.length-1].id:null;S.dirty=true;refreshList();syncControls();updateButtons()}
 function clearBase(){
+  if(S.baseLocked){setStatus('Image d’ensemble verrouillée : déverrouillez-la pour la supprimer.',true);return}
   for(const L of S.layers){gl.deleteTexture(L.tex);if(L.maskTex)gl.deleteTexture(L.maskTex);L.work=null}
   if(S.base){gl.deleteTexture(S.base.tex);S.base.work=null}
   S.base=null;S.layers=[];S.sel=null;S.baseFeat=null;S.pxPerMm=null;S.baseHidden=false;S.calib={active:false,pts:[],ref:null};
@@ -759,6 +763,7 @@ async function loadBitmap(file){return await createImageBitmap(file)}
 function workCanvas(bmp,maxSide){const k=Math.min(1,maxSide/Math.max(bmp.width,bmp.height));return downscaleCanvas(bmp,Math.max(1,Math.round(bmp.width*k)),Math.max(1,Math.round(bmp.height*k)))}
 function thumbOf(bmp){const c=document.createElement('canvas');c.width=88;c.height=68;const x=c.getContext('2d');x.fillStyle='#000';x.fillRect(0,0,88,68);const k=Math.min(88/bmp.width,68/bmp.height);x.imageSmoothingQuality='high';x.drawImage(bmp,(88-bmp.width*k)/2,(68-bmp.height*k)/2,bmp.width*k,bmp.height*k);return c}
 async function setBase(file){
+  if(S.base&&S.baseLocked){setStatus('Image d’ensemble verrouillée : déverrouillez-la pour la remplacer.',true);return}
   setStatus('Chargement de l’image d’ensemble…',false,.1);await tick();
   try{
     const bmp=await loadBitmap(file),r=await cropDialog(bmp);
@@ -1293,7 +1298,7 @@ $('#eGo').onclick=async()=>{
 function projectObject(withMask=true){
   const num=a=>a?Array.from(Object.values(a)):a;
   return {version:2,scale:S.pxPerMm?{pxPerMm:S.pxPerMm,ref:S.calib.ref}:null,
-    base:{name:S.base.name,w:S.base.w,h:S.base.h,src:S.base.src,crop:S.base.crop},
+    base:{name:S.base.name,w:S.base.w,h:S.base.h,src:S.base.src,crop:S.base.crop,locked:!!S.baseLocked},
     layers:S.layers.map(L=>({name:L.name,pxPerMm:S.pxPerMm?layerRes(L).pxmm:null,w:L.w,h:L.h,corners:L.corners,grid:L.grid,opacity:L.opacity,feather:L.feather,
       color:{...L.color,fit:L.color.fit?{...L.color.fit,M:num(L.color.fit.M),b:num(L.color.fit.b)}:null},
       located:L.located,visible:L.visible,locked:!!L.locked,mask:(withMask&&L.maskC&&L.maskOn)?L.maskC.toDataURL('image/png'):null}))};
@@ -1313,6 +1318,7 @@ async function openProject(files){
   const imgs=files.filter(f=>f!==jf),used=new Set(),stem=n=>n.replace(/\.[^.]+$/,'');
   const take=pred=>{const f=imgs.find(x=>!used.has(x)&&pred(x));if(f)used.add(f);return f};
   const reuse=!!S.base&&S.base.name===P.base.name&&S.base.w===P.base.w&&S.base.h===P.base.h;
+  if(!reuse&&S.base&&S.baseLocked){setStatus('Image d’ensemble verrouillée : déverrouillez-la avant d’ouvrir d’autres réglages.',true);return}
   const bf=reuse?null:take(f=>f.name===P.base.name);
   if(!reuse&&!bf){setStatus('Sélectionnez aussi la photo d’ensemble « '+P.base.name+' » (avec le .json et les photos de détail, en une seule fois).',true);return}
   S.busy=true;updateButtons();
@@ -1334,7 +1340,7 @@ async function openProject(files){
       out.__crop=c||null;out.__src=P.base.src||[bmp.width,bmp.height];
       await setBaseSource(out,bf.name);bmp.close&&bmp.close();
       if(!S.base||S.base.name!==bf.name)throw new Error('image d’ensemble non chargée');
-      S.base.file=bf;S.base.fkey=bf.fkey||newKey();
+      S.base.file=bf;S.base.fkey=bf.fkey||newKey();S.baseLocked=!!P.base.locked;
     }
     if(P.scale&&P.scale.pxPerMm){S.pxPerMm=P.scale.pxPerMm;S.calib.ref=P.scale.ref||null;S.showScale=true;syncCalib();updScaleInfo()}
     S.showAll=true;syncShow();
