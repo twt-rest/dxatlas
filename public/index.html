@@ -191,6 +191,7 @@ input[type=text],input[type=number],select{background:var(--bg);color:var(--tx);
       <h3 style="margin-top:14px">Déformation</h3>
       <div class="row">
         <button class="btn sm" id="bGridReset">Remettre la grille à plat</button>
+        <button class="btn sm" id="bLReset" title="Remet ce détail à son état d’origine : position de départ, grille, couleurs, opacité et gomme">Réinitialiser le détail</button>
       </div>
       <p class="note">Mode « Coins » : perspective exacte par 4 points. Mode « Grille » : 5 points en plus pour corriger distorsion d’objectif ou toile gondolée.</p>
     </div>
@@ -705,7 +706,7 @@ const LOCK_ON='<svg width="17" height="17" viewBox="0 0 24 24" fill="none" strok
 const LOCK_OFF='<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 7.5-2"/></svg>';
 function syncLock(L){
   const b=$('#bLock');b.textContent=L.locked?'Déverrouiller':'Verrouiller';b.classList.toggle('on',!!L.locked);
-  for(const id of['bLocate','bRefine','bRotL','bRotR','bDel','bGridReset'])$('#'+id).classList.toggle('dis',!!L.locked);
+  for(const id of['bLocate','bRefine','bRotL','bRotR','bDel','bGridReset','bLReset'])$('#'+id).classList.toggle('dis',!!L.locked);
 }
 function toggleLock(L){L.locked=!L.locked;S.dirty=true;refreshList();if(L.id===S.sel)syncLock(L)}
 $('#bLock').onclick=()=>{const L=selLayer();if(L)toggleLock(L)};
@@ -717,6 +718,17 @@ function syncControls(){
 for(const[r,o,p,f]of SL)$('#'+r).addEventListener('input',e=>{const L=selLayer();if(!L)return;const v=parseFloat(e.target.value);setp(L,p,v);$('#'+o).textContent=f(v);S.dirty=true});
 $('#tName').addEventListener('input',e=>{const L=selLayer();if(L){L.name=e.target.value;refreshList()}});
 $('#bColorReset').onclick=()=>{const L=selLayer();if(!L)return;L.color={fit:null,ev:0,contrast:1,sat:1,warm:0,tint:0};syncControls();S.dirty=true};
+function resetLayer(L){
+  if(!L||L.locked)return;
+  L.corners=(L.init||defaultQuad(L.w,L.h)).map(c=>c.slice());L.grid=null;
+  L.color={fit:null,ev:0,contrast:1,sat:1,warm:0,tint:0};L.opacity=.7;L.feather=.02;L.located=false;
+  if(L.maskC){const x=L.maskC.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,L.maskC.width,L.maskC.height);L.maskUndo=[];uploadMask(L);L.maskOn=false}
+  updateLayer(L);refreshList();syncControls();syncErase&&syncErase();
+  setStatus('Détail réinitialisé. Relancez « Localiser » pour le replacer automatiquement.');
+}
+$('#bLReset').onclick=()=>{const L=selLayer(),b=$('#bLReset');if(!L||L.locked)return;
+  if(b.dataset.armed){b.dataset.armed='';b.textContent='Réinitialiser le détail';resetLayer(L);return}
+  b.dataset.armed='1';b.textContent='Confirmer la réinitialisation ?';setTimeout(()=>{b.dataset.armed='';b.textContent='Réinitialiser le détail'},3500)};
 $('#bGridReset').onclick=()=>{const L=selLayer();if(!L||L.locked)return;L.grid=null;updateLayer(L)};
 function deleteLayer(L){if(!L||L.locked)return;gl.deleteTexture(L.tex);if(L.maskTex)gl.deleteTexture(L.maskTex);L.work=null;S.layers=S.layers.filter(x=>x!==L);if(S.sel===L.id)S.sel=S.layers.length?S.layers[S.layers.length-1].id:null;S.dirty=true;refreshList();syncControls();updateButtons()}
 function clearBase(){
@@ -893,12 +905,16 @@ function cropDialog(bmp){return new Promise(resolve=>{
   };
   layout();
 })}
-function newLayer(file,bmp,t){
+function defaultQuad(bw,bh){
   const st=$('#stage'),z=S.view.z;
   const cx=S.view.x0+st.clientWidth/2/z,cy=S.view.y0+st.clientHeight/2/z;
-  let w=Math.min(st.clientWidth*.35/z,S.base.w*.5),h=w*bmp.height/bmp.width;if(h>S.base.h*.5){h=S.base.h*.5;w=h*bmp.width/bmp.height}
+  let w=Math.min(st.clientWidth*.35/z,S.base.w*.5),h=w*bh/bw;if(h>S.base.h*.5){h=S.base.h*.5;w=h*bw/bh}
+  return[[cx-w/2,cy-h/2],[cx+w/2,cy-h/2],[cx+w/2,cy+h/2],[cx-w/2,cy+h/2]];
+}
+function newLayer(file,bmp,t){
+  const q0=defaultQuad(bmp.width,bmp.height);
   const L={id:S.nextId++,name:file.name.replace(/\.[^.]+$/,''),work:workCanvas(bmp,1600),w:bmp.width,h:bmp.height,tex:t.tex,thumb:thumbOf(bmp),
-    corners:[[cx-w/2,cy-h/2],[cx+w/2,cy-h/2],[cx+w/2,cy+h/2],[cx-w/2,cy+h/2]],grid:null,visible:true,located:false,opacity:.7,feather:.02,
+    corners:q0.map(c=>c.slice()),init:q0.map(c=>c.slice()),grid:null,visible:true,located:false,opacity:.7,feather:.02,
     color:{fit:null,ev:0,contrast:1,sat:1,warm:0,tint:0}};
   L.H=hFromQuad(L.corners);buildMesh(L);bmp.close&&bmp.close();return L;
 }
@@ -1296,7 +1312,7 @@ function projectObject(withMask=true){
     base:{name:S.base.name,w:S.base.w,h:S.base.h,src:S.base.src,crop:S.base.crop},
     layers:S.layers.map(L=>({name:L.name,pxPerMm:S.pxPerMm?layerRes(L).pxmm:null,w:L.w,h:L.h,corners:L.corners,grid:L.grid,opacity:L.opacity,feather:L.feather,
       color:{...L.color,fit:L.color.fit?{...L.color.fit,M:num(L.color.fit.M),b:num(L.color.fit.b)}:null},
-      located:L.located,visible:L.visible,locked:!!L.locked,mask:(withMask&&L.maskC&&L.maskOn)?L.maskC.toDataURL('image/png'):null}))};
+      init:L.init||null,located:L.located,visible:L.visible,locked:!!L.locked,mask:(withMask&&L.maskC&&L.maskOn)?L.maskC.toDataURL('image/png'):null}))};
 }
 $('#eJson').onclick=async()=>{
   const o=projectObject();
@@ -1349,6 +1365,7 @@ async function openProject(files){
       L.name=PL.name;L.corners=cp(PL.corners);L.grid=PL.grid?cp(PL.grid):null;
       if(PL.opacity!=null)L.opacity=PL.opacity;if(PL.feather!=null)L.feather=PL.feather;
       if(PL.color){L.color=Object.assign({fit:null,ev:0,contrast:1,sat:1,warm:0,tint:0},cp(PL.color));if(L.color.fit){L.color.fit.M=Array.from(Object.values(L.color.fit.M));L.color.fit.b=Array.from(Object.values(L.color.fit.b))}}
+      if(PL.init)L.init=cp(PL.init);
       L.located=!!PL.located;L.visible=PL.visible!==false;L.locked=!!PL.locked;
       updateLayer(L);
       if(PL.mask){try{ensureMask(L);const im=new Image();im.src=PL.mask;await im.decode();L.maskC.getContext('2d').drawImage(im,0,0,L.maskC.width,L.maskC.height);uploadMask(L)}catch(e){console.warn('masque non restauré',e)}}
