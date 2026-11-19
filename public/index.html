@@ -109,6 +109,7 @@ details>summary{cursor:pointer;color:var(--mut);font-size:11px;text-transform:up
         <label class="mi">Ouvrir des réglages…<input type="file" id="fProj" accept=".json,application/json,image/*" multiple hidden></label>
         <button class="mi dis" id="mJson">Enregistrer les réglages (.json)</button>
         <button class="mi dis" id="mPlate" title="Image d’ensemble avec l’emprise numérotée de chaque détail, légende et coordonnées">Planche de localisation (.png)</button>
+        <button class="mi dis" id="mDocx" title="Un tableau Word : l’image avec les emprises, puis la légende et les coordonnées en texte modifiable">Planche (.docx)</button>
         <button class="mi dis" id="mCsv" title="Position et taille de chaque détail sur l’image d’ensemble">Coordonnées (.csv)</button>
       </div></div>
     <button class="btn primary dis" id="bExport">Exporter</button>
@@ -780,7 +781,7 @@ $('#bEUndo').onclick=()=>{undoErase(selLayer());syncErase()};
 setSeg('#segMode','mode',()=>{$('#miniDiff').hidden=S.mode!=='diff';$('#miniCurt').hidden=S.mode!=='curtain'});
 $('#rGain').oninput=e=>{S.gain=+e.target.value;S.dirty=true};$('#rSplit').oninput=e=>{S.split=+e.target.value;S.dirty=true};
 $('#bFit').onclick=fitView;
-function updateButtons(){const has=!!S.base;$('#lblDet').classList.toggle('dis',!has||S.busy);$('#bExport').classList.toggle('dis',!has||S.busy);$('#mJson').classList.toggle('dis',!has||S.busy);for(const id of['mPlate','mCsv'])$('#'+id).classList.toggle('dis',!has||S.busy||!S.layers.length);$('#empty').hidden=has;$('#tools').hidden=!has;$('#modes').hidden=!has;
+function updateButtons(){const has=!!S.base;$('#lblDet').classList.toggle('dis',!has||S.busy);$('#bExport').classList.toggle('dis',!has||S.busy);$('#mJson').classList.toggle('dis',!has||S.busy);for(const id of['mPlate','mDocx','mCsv'])$('#'+id).classList.toggle('dis',!has||S.busy||!S.layers.length);$('#empty').hidden=has;$('#tools').hidden=!has;$('#modes').hidden=!has;
   for(const id of['bLocate','bRefine','bColor','bLC','bDel'])$('#'+id).disabled=S.busy&&id!=='bDel'}
 
 /* ---------- chargement des images ---------- */
@@ -1362,55 +1363,109 @@ async function saveCsv(){
   try{await saveBlob('coordonnees-details.csv',new Blob([txt],{type:'text/csv;charset=utf-8'}));setStatus('Coordonnées enregistrées. Origine : coin supérieur gauche de l’image d’ensemble.')}
   catch(e){setStatus('Échec de l’enregistrement : '+e.message,true)}
 }
+const PLATE_COL='#00b8d9',PLATE_BADGE='#0097b2';
+function plateOverview(P,W0){ // image d’ensemble + emprises cyan numérotées (sans marge ni légende)
+  const B=S.base,src=B.work,k=W0/B.w,u=W0/1600,H=Math.round(B.h*k);
+  const c=document.createElement('canvas');c.width=W0;c.height=H;const x=c.getContext('2d');
+  x.imageSmoothingQuality='high';x.drawImage(src,0,0,W0,H);x.lineJoin='round';
+  for(const p of P){
+    x.beginPath();p.poly.forEach((q,i)=>{const X=q[0]*k,Y=q[1]*k;i?x.lineTo(X,Y):x.moveTo(X,Y)});x.closePath();
+    x.fillStyle='rgba(0,184,217,.22)';x.fill();x.strokeStyle=PLATE_COL;x.lineWidth=Math.max(2,3*u);x.stroke();
+  }
+  for(const p of P){
+    const r=Math.round(15*u),cx=p.cx*k,cy=p.cy*k;
+    x.beginPath();x.arc(cx,cy,r,0,7);x.fillStyle=PLATE_BADGE;x.fill();x.lineWidth=2*u;x.strokeStyle='#fff';x.stroke();
+    x.fillStyle='#fff';x.font=`700 ${Math.round(16*u)}px system-ui,sans-serif`;x.textAlign='center';x.textBaseline='middle';x.fillText(String(p.n),cx,cy+1);
+  }
+  return c;
+}
+function plateLine(p){ // texte de légende d’un détail : [position, taille]
+  const B=S.base;
+  const pct=`${nf(p.x/B.w*100)} % ; ${nf(p.y/B.h*100)} %`,pct2=`${nf(p.w/B.w*100)} % × ${nf(p.h/B.h*100)} %`;
+  return S.pxPerMm?[`${nf(p.cm.x)} ; ${nf(p.cm.y)} cm (${pct})`,`${nf(p.cm.w)} × ${nf(p.cm.h)} cm (${pct2})`]
+                  :[`${nf(p.x,0)} ; ${nf(p.y,0)} px (${pct})`,`${nf(p.w,0)} × ${nf(p.h,0)} px (${pct2})`];
+}
+function plateFoot(){const B=S.base;return `Image d’ensemble : ${B.name} — ${B.w} × ${B.h} px`+(S.pxPerMm?` — champ ${fmtLen(B.w/S.pxPerMm)} × ${fmtLen(B.h/S.pxPerMm)}`:'')+'. Position = coin supérieur gauche de l’emprise du détail ; origine = coin supérieur gauche de l’image d’ensemble.'}
 async function savePlate(){
   if(!S.base||!S.layers.length){setStatus('Ajoutez d’abord des détails.',true);return}
   setStatus('Création de la planche…',false,.3);await tick();
   try{
-    const B=S.base,mm=S.pxPerMm,P=placements(),src=B.work,W0=Math.max(1600,src.width),k=W0/B.w,u=W0/1600;
-    const pad=Math.round(40*u),imgW=W0,imgH=Math.round(B.h*k),rowH=Math.round(30*u),colors=['#e6194b','#3cb44b','#f58231','#4363d8','#911eb4','#008c8c','#c2185b','#7a9a01','#8d5524','#000075'];
+    const B=S.base,mm=S.pxPerMm,P=placements(),W0=Math.max(1600,B.work.width),u=W0/1600;
+    const pad=Math.round(40*u),imgW=W0,imgH=Math.round(B.h*(W0/B.w)),rowH=Math.round(30*u);
     const headH=Math.round(70*u),legH=Math.round(34*u)+P.length*rowH+Math.round(56*u);
     const c=document.createElement('canvas');c.width=imgW+2*pad;c.height=headH+imgH+Math.round(24*u)+legH+pad;
     const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);
     x.fillStyle='#111';x.font=`600 ${Math.round(26*u)}px system-ui,sans-serif`;x.textBaseline='alphabetic';
     x.fillText('Planche de localisation des détails',pad,Math.round(44*u));
-    const oy=headH;x.imageSmoothingQuality='high';x.drawImage(src,pad,oy,imgW,imgH);
-    x.lineJoin='round';
-    for(const p of P){
-      const col=colors[(p.n-1)%colors.length];
-      x.beginPath();p.poly.forEach((q,i)=>{const X=pad+q[0]*k,Y=oy+q[1]*k;i?x.lineTo(X,Y):x.moveTo(X,Y)});x.closePath();
-      x.fillStyle=col+'33';x.fill();x.strokeStyle=col;x.lineWidth=Math.max(2,3*u);x.stroke();
-    }
-    for(const p of P){ // pastilles numérotées
-      const col=colors[(p.n-1)%colors.length],r=Math.round(15*u),cx=pad+p.cx*k,cy=oy+p.cy*k;
-      x.beginPath();x.arc(cx,cy,r,0,7);x.fillStyle=col;x.fill();x.lineWidth=2*u;x.strokeStyle='#fff';x.stroke();
-      x.fillStyle='#fff';x.font=`700 ${Math.round(16*u)}px system-ui,sans-serif`;x.textAlign='center';x.textBaseline='middle';x.fillText(String(p.n),cx,cy+1);
-    }
-    x.textAlign='left';x.textBaseline='alphabetic';
+    const oy=headH;x.drawImage(plateOverview(P,W0),pad,oy);
     let y=oy+imgH+Math.round(24*u);
-    const cols=mm?[0,48,330,560,760,990,1190]:[0,48,330,600,900,1200],hd=mm?['N°','Détail','Position (x ; y) en cm','Taille (l × h) en cm','Position en % de l’image','Taille en % de l’image']:['N°','Détail','Position (x ; y) en px','Taille (l × h) en px','Position en % de l’image'];
-    const cx0=pad;x.fillStyle='#555';x.font=`600 ${Math.round(14*u)}px system-ui,sans-serif`;
-    hd.forEach((t,i)=>x.fillText(t,cx0+cols[i]*u,y+Math.round(8*u)));
+    const cols=[0,48,330,640,1000],hd=['N°','Détail','Position (x ; y)','Taille (l × h)'];
+    x.fillStyle='#555';x.font=`600 ${Math.round(14*u)}px system-ui,sans-serif`;
+    hd.forEach((t,i)=>x.fillText(t,pad+cols[i]*u,y+Math.round(8*u)));
     x.strokeStyle='#bbb';x.lineWidth=1;x.beginPath();x.moveTo(pad,y+Math.round(16*u));x.lineTo(pad+imgW,y+Math.round(16*u));x.stroke();
     y+=Math.round(16*u);
-    x.font=`${Math.round(15*u)}px system-ui,sans-serif`;
     for(const p of P){
-      y+=rowH;const col=colors[(p.n-1)%colors.length];
-      x.fillStyle=col;x.fillRect(cx0,y-Math.round(17*u),Math.round(26*u),Math.round(22*u));x.fillStyle='#fff';x.textAlign='center';x.font=`700 ${Math.round(14*u)}px system-ui,sans-serif`;x.fillText(String(p.n),cx0+Math.round(13*u),y);
+      y+=rowH;
+      x.fillStyle=PLATE_BADGE;x.fillRect(pad,y-Math.round(17*u),Math.round(26*u),Math.round(22*u));x.fillStyle='#fff';x.textAlign='center';x.font=`700 ${Math.round(14*u)}px system-ui,sans-serif`;x.fillText(String(p.n),pad+Math.round(13*u),y);
       x.textAlign='left';x.fillStyle='#111';x.font=`${Math.round(15*u)}px system-ui,sans-serif`;
       let nm=p.name;while(nm.length>3&&x.measureText(nm).width>(cols[2]-cols[1]-14)*u)nm=nm.slice(0,-2);if(nm!==p.name)nm=nm.trimEnd()+'…';
-      const vals=mm?[nm,`${nf(p.cm.x)} ; ${nf(p.cm.y)}`,`${nf(p.cm.w)} × ${nf(p.cm.h)}`,`${nf(p.x/B.w*100)} % ; ${nf(p.y/B.h*100)} %`,`${nf(p.w/B.w*100)} % × ${nf(p.h/B.h*100)} %`]
-        :[nm,`${nf(p.x,0)} ; ${nf(p.y,0)}`,`${nf(p.w,0)} × ${nf(p.h,0)}`,`${nf(p.x/B.w*100)} % ; ${nf(p.y/B.h*100)} %`];
-      vals.forEach((t,i)=>x.fillText(t,cx0+cols[i+1]*u,y));
+      const[a,b]=plateLine(p);x.fillText(nm,pad+cols[1]*u,y);x.fillText(a,pad+cols[2]*u,y);x.fillText(b,pad+cols[3]*u,y);
     }
     y+=Math.round(34*u);x.fillStyle='#666';x.font=`${Math.round(13*u)}px system-ui,sans-serif`;
-    x.fillText(`Image d’ensemble : ${B.name} — ${B.w} × ${B.h} px`+(mm?` — champ ${fmtLen(B.w/mm)} × ${fmtLen(B.h/mm)}`:'')+'.',pad,y);
-    y+=Math.round(20*u);
-    x.fillText('Position = coin supérieur gauche de l’emprise du détail, l’origine étant le coin supérieur gauche de l’image d’ensemble.',pad,y);
+    const foot=plateFoot().split(' Position = ');x.fillText(foot[0],pad,y);y+=Math.round(20*u);x.fillText('Position = '+foot[1],pad,y);
     const blob=await new Promise(r=>c.toBlob(r,'image/png'));
     await saveBlob('planche-localisation.png',blob);setStatus('Planche de localisation enregistrée.');
   }catch(e){console.error(e);setStatus('Échec de la planche : '+e.message,true)}
 }
-$('#mCsv').onclick=saveCsv;$('#mPlate').onclick=savePlate;
+/* ---------- export Word (.docx) : un tableau = image + légende en texte ---------- */
+function zipStore(files,type){
+  const enc=new TextEncoder(),parts=[],cd=[];let off=0;
+  for(const f of files){
+    const nm=enc.encode(f.name),crc=crc32(f.data),sz=f.data.length,lh=new DataView(new ArrayBuffer(30));
+    lh.setUint32(0,0x04034b50,true);lh.setUint16(4,20,true);lh.setUint16(6,0x0800,true);lh.setUint16(12,0x21,true);lh.setUint32(14,crc,true);lh.setUint32(18,sz,true);lh.setUint32(22,sz,true);lh.setUint16(26,nm.length,true);
+    parts.push(new Uint8Array(lh.buffer),nm,f.data);
+    const ch=new DataView(new ArrayBuffer(46));
+    ch.setUint32(0,0x02014b50,true);ch.setUint16(4,20,true);ch.setUint16(6,20,true);ch.setUint16(8,0x0800,true);ch.setUint16(14,0x21,true);ch.setUint32(16,crc,true);ch.setUint32(20,sz,true);ch.setUint32(24,sz,true);ch.setUint16(28,nm.length,true);ch.setUint32(42,off,true);
+    cd.push(new Uint8Array(ch.buffer),nm);off+=30+nm.length+sz;
+  }
+  const cdSize=cd.reduce((a,b)=>a+b.length,0),e=new DataView(new ArrayBuffer(22));
+  e.setUint32(0,0x06054b50,true);e.setUint16(8,files.length,true);e.setUint16(10,files.length,true);e.setUint32(12,cdSize,true);e.setUint32(16,off,true);
+  return new Blob([...parts,...cd,new Uint8Array(e.buffer)],{type});
+}
+const xe=t=>String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+async function saveDocx(){
+  if(!S.base||!S.layers.length){setStatus('Ajoutez d’abord des détails.',true);return}
+  setStatus('Création du document Word…',false,.3);await tick();
+  try{
+    const B=S.base,P=placements(),W0=Math.max(1600,B.work.width),ov=plateOverview(P,W0);
+    const png=new Uint8Array(await (await new Promise(r=>ov.toBlob(r,'image/png'))).arrayBuffer()),enc=new TextEncoder();
+    let cx=5940000,cy=Math.round(cx*ov.height/ov.width);const maxH=5220000;if(cy>maxH){cx=Math.round(cx*maxH/cy);cy=maxH}
+    const run=(t,o={})=>`<w:r><w:rPr>${o.b?'<w:b/>':''}${o.col?`<w:color w:val="${o.col}"/>`:''}<w:sz w:val="${o.sz||20}"/></w:rPr><w:t xml:space="preserve">${xe(t)}</w:t></w:r>`;
+    const para=(runs,ppr='')=>`<w:p><w:pPr><w:spacing w:before="0" w:after="80"/>${ppr}</w:pPr>${runs}</w:p>`;
+    const legend=para(run('Légende et coordonnées',{b:1,sz:22}))+P.map(p=>{const[a,b]=plateLine(p);
+      return para(run(String(p.n),{b:1,col:PLATE_BADGE.slice(1)})+run('  '+p.name,{b:1})+run(' — Position : '+a+' · Taille : '+b))}).join('')
+      +para(run(plateFoot(),{sz:16,col:'666666'}));
+    const W='xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"';
+    const draw=`<w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="${cx}" cy="${cy}"/><wp:docPr id="1" name="Planche" descr="Image d’ensemble avec l’emprise numérotée des détails"/><wp:cNvGraphicFramePr><a:graphicFrameLocks noChangeAspect="1"/></wp:cNvGraphicFramePr><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic><pic:nvPicPr><pic:cNvPr id="0" name="planche.png"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="rId1"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing>`;
+    const bd=['top','left','bottom','right','insideH','insideV'].map(n=>`<w:${n} w:val="single" w:sz="4" w:space="0" w:color="999999"/>`).join('');
+    const doc=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document ${W}><w:body>`
+      +para(run('Planche de localisation des détails',{b:1,sz:32}))
+      +`<w:tbl><w:tblPr><w:tblW w:w="9638" w:type="dxa"/><w:tblBorders>${bd}</w:tblBorders><w:tblLayout w:type="fixed"/><w:tblCellMar><w:top w:w="100" w:type="dxa"/><w:left w:w="120" w:type="dxa"/><w:bottom w:w="60" w:type="dxa"/><w:right w:w="120" w:type="dxa"/></w:tblCellMar></w:tblPr><w:tblGrid><w:gridCol w:w="9638"/></w:tblGrid>`
+      +`<w:tr><w:tc><w:tcPr><w:tcW w:w="9638" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:jc w:val="center"/><w:spacing w:before="0" w:after="0"/></w:pPr><w:r>${draw}</w:r></w:p></w:tc></w:tr>`
+      +`<w:tr><w:tc><w:tcPr><w:tcW w:w="9638" w:type="dxa"/></w:tcPr>${legend}</w:tc></w:tr></w:tbl>`
+      +`<w:p/><w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1134" w:right="1134" w:bottom="1134" w:left="1134" w:header="708" w:footer="708" w:gutter="0"/></w:sectPr></w:body></w:document>`;
+    const X='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
+    const files=[
+      {name:'[Content_Types].xml',data:enc.encode(X+'<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Default Extension="png" ContentType="image/png"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>')},
+      {name:'_rels/.rels',data:enc.encode(X+'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>')},
+      {name:'word/document.xml',data:enc.encode(doc)},
+      {name:'word/_rels/document.xml.rels',data:enc.encode(X+'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/planche.png"/></Relationships>')},
+      {name:'word/media/planche.png',data:png}];
+    await saveBlob('planche-localisation.docx',zipStore(files,'application/vnd.openxmlformats-officedocument.wordprocessingml.document'));
+    setStatus('Document Word enregistré : un tableau avec l’image, puis la légende et les coordonnées en texte.');
+  }catch(e){console.error(e);setStatus('Échec de l’export Word : '+e.message,true)}
+}
+$('#mCsv').onclick=saveCsv;$('#mPlate').onclick=savePlate;$('#mDocx').onclick=saveDocx;
 
 /* ---------- ouverture d’un fichier de réglages (.json) + photos ---------- */
 async function openProject(files){
